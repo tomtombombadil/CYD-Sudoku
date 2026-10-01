@@ -4,15 +4,19 @@
 
 **Boards** (one PlatformIO environment each):
 
-| Env | Board | Panel | Touch | Status |
+| Env | Board (silkscreen) | Panel | Touch | Status |
 |---|---|---|---|---|
-| `cyd28r_ili9341` | ESP32-2432S028R, 2.8", single micro-USB | ILI9341 240×320 | XPT2046 (resistive) | Working (build verified) |
-| `cyd28r_st7789` | ESP32-2432S028R, 2.8", micro-USB + USB-C | ST7789 240×320 | XPT2046 | Not started |
-| `cyd32_st7789` | ESP32-2432S032, 3.2" | ST7789 240×320 | TBD (R or C variant) | Not started |
-| `cyd35_st7796` | ESP32-3248S035, 3.5" | ST7796 320×480 | TBD | Not started |
-| `cyd40_st7796` | 4.0" CYD | ST7796 320×480 | TBD | Not started |
+| `cyd28_ili9341` | Sunton ESP32-2432S028(R), 2.8" | ILI9341 240×320 | XPT2046, own pins | Builds; untested on hardware |
+| `cyd28_st7789` | Sunton ESP32-2432S028(R), 2.8" | ST7789 240×320 | XPT2046, own pins | Builds; untested on hardware |
+| `lcdwiki32_st7789` | LCDwiki E32R32P — "3.2" LCD Display, ESP32-32E" | ST7789P3 IPS 240×320 | XPT2046, shares display SPI | Builds; untested on hardware |
+| `lcdwiki35_st7796` | LCDwiki E32R35T — "3.5" LCD Display, ESP32-32E" | ST7796U 320×480 | XPT2046, shares display SPI | Builds; untested on hardware |
+| `lcdwiki40_st7796` | LCDwiki E32R40T — "4.0" LCD Display, ESP32-32E" | ST7796S 320×480 | XPT2046, shares display SPI | Builds; untested on hardware |
 | `nm_cyd_c5` | NM-CYD-C5 (ESP32-C5) | 2.8" 320×240 | TBD | Stretch goal |
 
+The 3.2"/3.5"/4.0" boards are LCDwiki "ESP32-32E" boards, not Sunton
+ESP32-3248S0xx — different backlight pin (27), LED pins and touch wiring.
+
+- **Color fixes per unit:** inversion and red/blue order can be toggled on the device and are saved to flash, because panels vary between production runs.
 - **Storage:** LittleFS on internal flash (saves, settings, touch calibration, puzzle packs); microSD optional later.
 - **UI constraint:** design for resistive taps — large targets, no swipe gestures.
 

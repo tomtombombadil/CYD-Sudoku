@@ -20,12 +20,20 @@
 - Resistive-touch UX: big targets, no swipes/gestures.
 
 ## Known hardware issues
-- ESP32-2432S028R: touch (XPT2046) uses VSPI on pins 25/32/39/33; the SD card
+- Tom's boards: Sunton ESP32-2432S028 2.8" (both ILI9341 and ST7789 versions)
+  and LCDwiki "ESP32-32E" 3.2" (E32R32P), 3.5" (E32R35T), 4.0" (E32R40T).
+  The LCDwiki boards have no model number on the PCB - only text like
+  "3.2" LCD Display, ESP32-32E, 240x320, Resistive Touch". They are NOT
+  Sunton ESP32-3248S0xx boards; never use Sunton pinouts for them.
+- Sunton 2.8": touch (XPT2046) uses VSPI on pins 25/32/39/33; the SD card
   is also VSPI but on 18/19/23/5. LovyanGFX's XPT2046 driver has no software
-  SPI, so SD support will need either a small bit-banged XPT2046 touch class
-  or careful bus switching. LittleFS is used first for this reason.
-- Panel color order / inversion differ between production runs; overridable
-  with `-D CYD_PANEL_RGB_ORDER=1` / `-D CYD_PANEL_INVERT=1`.
+  SPI, so SD on this board needs a bit-banged XPT2046 touch class or bus
+  switching. LittleFS is used first for this reason.
+- LCDwiki ESP32-32E: touch shares the display's HSPI bus (CS 33); SD is on
+  VSPI by itself, so SD works there without conflict.
+- Panel inversion / red-blue order differ between production runs. They are
+  fixed per unit on the device (src/hal/panel_prefs.*, saved to LittleFS),
+  not with build flags.
 
 ## Licensing
 MIT. Only copy code from MIT/BSD/Apache/zlib/public-domain sources and keep

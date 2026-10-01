@@ -17,7 +17,7 @@ jobs:
       fail-fast: false
       matrix:
         # Add an env here once its src/boards/ file exists.
-        env: [cyd28r_ili9341]
+        env: [cyd28_ili9341, cyd28_st7789, lcdwiki32_st7789, lcdwiki35_st7796, lcdwiki40_st7796]
     steps:
       - uses: actions/checkout@v4
 

@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 #include <esp_heap_caps.h>
+#include "panel_prefs.h"
 #include "touch_cal.h"
 
 namespace {
@@ -28,6 +29,9 @@ void flush_cb(lv_display_t* d, const lv_area_t* area, uint8_t* px_map)
 // coordinates go straight to LVGL (LVGL's own rotation is left at 0).
 void touch_read_cb(lv_indev_t*, lv_indev_data_t* data)
 {
+    // On boards where touch shares the display's SPI bus, the bus must be
+    // idle before LovyanGFX briefly hands it to the touch controller.
+    gfx.waitDMA();
     lgfx::touch_point_t tp;
     if (gfx.getTouch(&tp, 1)) {
         data->point.x = tp.x;
@@ -54,6 +58,7 @@ lv_display_t* lvgl_port_init(uint8_t rotation)
     gfx.initDMA();
     gfx.setRotation(rotation);
     gfx.setBrightness(200);
+    panel_prefs_begin(gfx);
     gfx.fillScreen(TFT_BLACK);
 
     // Uses plain LovyanGFX drawing, so it must run before LVGL owns the bus.
@@ -87,8 +92,8 @@ lv_display_t* lvgl_port_init(uint8_t rotation)
     lv_indev_set_read_cb(touch, touch_read_cb);
     lv_indev_set_display(touch, disp);
 
-    // Keep the display SPI transaction open; the panel has the HSPI bus to
-    // itself and touch is on a different SPI host.
+    // Keep the display SPI transaction open between flushes. On boards where
+    // touch shares the bus, LovyanGFX ends/resumes it around each touch read.
     gfx.startWrite();
 
     Serial.printf("[lvgl_port] %s  %ldx%ld  rot %u  buffers 2x%lu B  free heap %lu\n",

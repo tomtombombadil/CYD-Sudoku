@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 #include <LittleFS.h>
+#include "storage.h"
 
 namespace {
 
@@ -26,20 +27,9 @@ uint32_t board_hash()
     return h;
 }
 
-bool fs_ready()
-{
-    static bool mounted = false;
-    if (!mounted) {
-        // true = format if the partition has never been formatted
-        mounted = LittleFS.begin(true);
-        if (!mounted) Serial.println("[touch_cal] LittleFS mount failed");
-    }
-    return mounted;
-}
-
 bool load(uint16_t out[8])
 {
-    if (!fs_ready() || !LittleFS.exists(kCalPath)) return false;
+    if (!storage_begin() || !LittleFS.exists(kCalPath)) return false;
     File f = LittleFS.open(kCalPath, "r");
     if (!f) return false;
     CalFile c{};
@@ -52,7 +42,7 @@ bool load(uint16_t out[8])
 
 void save(const uint16_t params[8])
 {
-    if (!fs_ready()) return;
+    if (!storage_begin()) return;
     CalFile c{kMagic, board_hash(), {}};
     memcpy(c.params, params, sizeof(c.params));
     File f = LittleFS.open(kCalPath, "w");

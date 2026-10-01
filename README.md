@@ -8,14 +8,18 @@ A polished, touch-friendly Sudoku for the ESP32 "Cheap Yellow Display" family.
 
 ## Supported boards
 
-| Board | PlatformIO env | Status |
+| Board (what's printed on it) | PlatformIO env | Status |
 |---|---|---|
-| ESP32-2432S028R 2.8" ILI9341 (single micro-USB) | `cyd28r_ili9341` | ✅ builds, needs hardware test |
-| ESP32-2432S028R 2.8" ST7789 (micro-USB + USB-C) | `cyd28r_st7789` | planned |
-| ESP32-2432S032 3.2" ST7789 | `cyd32_st7789` | planned |
-| ESP32-3248S035 3.5" ST7796 | `cyd35_st7796` | planned |
-| 4.0" ST7796 CYD | `cyd40_st7796` | planned |
+| ESP32-2432S028 2.8", ILI9341 panel | `cyd28_ili9341` | builds, needs hardware test |
+| ESP32-2432S028 2.8", ST7789 panel | `cyd28_st7789` | builds, needs hardware test |
+| "3.2" LCD Display, ESP32-32E, 240x320" (LCDwiki E32R32P) | `lcdwiki32_st7789` | builds, needs hardware test |
+| "3.5" LCD Display, ESP32-32E, 320x480" (LCDwiki E32R35T) | `lcdwiki35_st7796` | builds, needs hardware test |
+| "4.0" LCD Display, ESP32-32E, 320x480" (LCDwiki E32R40T) | `lcdwiki40_st7796` | builds, needs hardware test |
 | NM-CYD-C5 (ESP32-C5) | `nm_cyd_c5` | stretch goal |
+
+Not sure whether a 2.8" board is ILI9341 or ST7789? Flash either one: if
+colors look wrong, use the **Invert** / **Swap R/B** buttons first; if the
+picture is garbled or blank, try the other build.
 
 ## Building (Windows, VS Code + PlatformIO)
 
@@ -36,6 +40,13 @@ Tool or esptool. A browser-based flasher is planned.
 On first boot (or when the **BOOT** button is held while powering on), the
 screen shows corner arrows — tap each tip precisely. The calibration is saved
 to flash and reused. The test screen also has a **Recalibrate touch** button.
+
+## Colors look wrong?
+
+Panels vary between production runs. On the test screen, tap **Invert** if
+the background is light or colors look like a photo negative, and
+**Swap R/B** if the red and blue bars are swapped. The fix is saved on the
+board.
 
 ## License
 
