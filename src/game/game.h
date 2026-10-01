@@ -26,6 +26,8 @@ public:
     static constexpr int kUndoCap = 600;
 
     void start(Difficulty d, sudoku::Rng& rng);
+    // Start from a puzzle made elsewhere (e.g. the background puzzle stock)
+    void start_with(Difficulty d, const sudoku::Grid& puzzle, const sudoku::Grid& solution);
     void restart();                       // clear all entries, keep the puzzle
 
     // ---- Queries -----------------------------------------------------------

@@ -59,9 +59,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Generator and rules tests
         run: |
-          g++ -std=c++17 -O1 -Wall -Werror -fsanitize=address,undefined -o test_sudoku tools/host_tests/test_sudoku.cpp src/game/sudoku.cpp
-          g++ -std=c++17 -O1 -Wall -Werror -fsanitize=address,undefined -o test_game tools/host_tests/test_game.cpp src/game/game.cpp src/game/sudoku.cpp
-          g++ -std=c++17 -O1 -Wall -Werror -fsanitize=address,undefined -o test_stats tools/host_tests/test_stats.cpp src/game/stats.cpp src/game/sudoku.cpp
+          g++ -std=c++17 -O1 -Wall -Werror -fsanitize=address,undefined -o test_sudoku tools/host_tests/test_sudoku.cpp src/game/sudoku.cpp src/game/grader.cpp
+          g++ -std=c++17 -O1 -Wall -Werror -fsanitize=address,undefined -o test_game tools/host_tests/test_game.cpp src/game/game.cpp src/game/sudoku.cpp src/game/grader.cpp
+          g++ -std=c++17 -O1 -Wall -Werror -fsanitize=address,undefined -o test_stats tools/host_tests/test_stats.cpp src/game/stats.cpp src/game/sudoku.cpp src/game/grader.cpp
           ./test_sudoku
           ./test_game
           ./test_stats

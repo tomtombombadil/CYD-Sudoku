@@ -70,6 +70,12 @@ void panel_prefs_begin(LGFX& gfx)
 
 const PanelPrefs& panel_prefs_get() { return current; }
 
+void panel_prefs_flash(LGFX& gfx, bool on)
+{
+    gfx.waitDMA();
+    gfx.invertDisplay(current.invert ^ on);
+}
+
 void panel_prefs_set(LGFX& gfx, const PanelPrefs& prefs)
 {
     current = prefs;

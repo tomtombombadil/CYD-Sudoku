@@ -12,7 +12,8 @@ struct SettingsFile {
     uint32_t magic;
     uint8_t  theme;
     uint8_t  input;
-    uint8_t  reserved[6];   // room for later settings without a format change
+    uint8_t  brightness;    // 0 = not set (files from before the slider)
+    uint8_t  reserved[5];   // room for later settings without a format change
 };
 } // namespace
 
@@ -25,6 +26,7 @@ ui::UiSettings settings_store_load()
     if (f && f.read(reinterpret_cast<uint8_t*>(&d), sizeof d) == sizeof d && d.magic == kMagic) {
         if (d.theme <= 1) s.theme = static_cast<ui::Theme>(d.theme);
         if (d.input <= 1) s.input = static_cast<ui::InputMode>(d.input);
+        if (d.brightness >= ui::kMinBrightness) s.brightness = d.brightness;
     }
     f.close();
     return s;
@@ -33,7 +35,7 @@ ui::UiSettings settings_store_load()
 void settings_store_save(const ui::UiSettings& s)
 {
     if (!storage_begin()) return;
-    SettingsFile d{kMagic, static_cast<uint8_t>(s.theme), static_cast<uint8_t>(s.input), {}};
+    SettingsFile d{kMagic, static_cast<uint8_t>(s.theme), static_cast<uint8_t>(s.input), s.brightness, {}};
     File f = LittleFS.open(kPath, "w");
     if (!f) return;
     f.write(reinterpret_cast<const uint8_t*>(&d), sizeof d);

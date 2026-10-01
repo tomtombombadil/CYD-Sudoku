@@ -150,6 +150,11 @@
   }
   .board h3 { margin: 0; font: 600 1.15rem/1.3 "Barlow", sans-serif; }
   .board .hint { margin: 4px 0 0; color: var(--muted); font-size: 0.97rem; }
+  .board .untested {
+    display: table; margin: 6px 0 0; padding: 2px 8px;
+    border: 1px solid var(--copper); border-radius: 4px;
+    color: var(--copper); font-size: 0.9rem;
+  }
   .board .dl { font-size: 0.9rem; margin-top: 6px; display: inline-block; }
   .actions { align-self: center; }
 
@@ -252,6 +257,11 @@
       el("div", {},
         el("h3", {}, `${size}" ${rest}`),
         el("p", { class: "hint" }, b.hint),
+        ...(b.tested === false
+          ? [el("p", { class: "untested" }, "Not yet tested on this board. Please ",
+                el("a", { href: "https://github.com/tomtombombadil/CYD-Sudoku/issues" }, "tell us"),
+                " if it works or not.")]
+          : []),
         el("a", { class: "dl", href: `firmware/${b.file}`, download: b.file }, `Download ${b.file} (${kb} KB, flash at 0x0)`)),
       el("div", { class: "actions" }, btn));
   }

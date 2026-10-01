@@ -36,11 +36,20 @@ inline bool same_unit(int a, int b)
 // If `out` is non-null, the first solution found is written there.
 int count_solutions(const Grid& g, int limit, Grid* out = nullptr);
 
-// Make a puzzle with exactly one solution.
-// Clue target by difficulty: Easy ~38, Medium ~32, Hard ~28, Expert as few
-// as the digging finds (usually 23-26). Removal keeps 180-degree symmetry.
-// `puzzle` gets the clues, `solution` the full grid.
-void generate(Difficulty d, Rng& rng, Grid& puzzle, Grid& solution);
+// Make a puzzle with exactly one solution, graded by the solving techniques
+// it needs (see grader.h):
+//   Easy    singles only, 36+ clues
+//   Medium  needs locked candidates (pointing/claiming), ~30 clues
+//   Hard    needs pairs/triples or X-Wing, nothing harder
+//   Expert  needs Swordfish, XY-Wing or XYZ-Wing; always solvable by logic
+// Removal keeps 180-degree symmetry. `puzzle` gets the clues, `solution`
+// the full grid.
+// `yield` (optional) is called between attempts so a background task can
+// let other tasks run.
+void generate(Difficulty d, Rng& rng, Grid& puzzle, Grid& solution, void (*yield)() = nullptr);
+
+// Technique level a puzzle needs: 1-4 as in grader.h, 5 = beyond level 4.
+int difficulty_level(const Grid& puzzle);
 
 int clue_count(const Grid& g);
 

@@ -156,10 +156,6 @@ int main(int argc, char** argv)
 
         ui::game_screen_open_menu();
         shot(pre + "_5_menu.ppm");
-        if (t == 0) {                                // first tap on Easy: asks to confirm
-            ui::game_screen_menu_tap_new_game(0);
-            shot(pre + "_5b_menu_confirm.ppm");
-        }
         ui::game_screen_open_stats();
         shot(pre + "_6_stats.ppm");
         ui::game_screen_open_settings();

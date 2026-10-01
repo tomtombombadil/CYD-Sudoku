@@ -35,6 +35,7 @@ def boards_from_ini():
             "name": name,
             "title": env.get("custom_board_title", name),
             "hint": env.get("custom_board_hint", ""),
+            "tested": env.get("custom_board_tested", "yes").strip().lower() != "no",
         })
     return boards
 

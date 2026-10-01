@@ -3,6 +3,7 @@
 #include <esp_random.h>
 #include <lvgl.h>
 #include "app/save_store.h"
+#include "app/puzzle_stock.h"
 #include "app/settings_store.h"
 #include "app/stats_store.h"
 #include "game/game.h"
@@ -67,6 +68,8 @@ void toggle_swap_rb()
     redraw_all();
 }
 
+void flash_invert(bool on) { panel_prefs_flash(lvgl_port_gfx(), on); }
+
 void recalibrate()
 {
     // Calibration draws with LovyanGFX directly; restarting afterwards gives
@@ -92,6 +95,7 @@ void setup()
         while (true) delay(1000);
     }
 
+    puzzle_stock_begin();
     if (!save_store_load(the_game) || !the_game.active()) {
         sudoku::Rng rng(hw_seed());
         the_game.start(sudoku::Difficulty::Easy, rng);
@@ -100,10 +104,13 @@ void setup()
 
     ui::UiHooks hooks{};
     hooks.random_seed       = hw_seed;
+    hooks.take_puzzle       = puzzle_stock_take;
     hooks.save              = save_store_save;
     hooks.save_settings     = settings_store_save;
     hooks.toggle_invert     = toggle_invert;
     hooks.toggle_swap_rb    = toggle_swap_rb;
+    hooks.flash_invert      = flash_invert;
+    hooks.set_brightness    = lvgl_port_set_brightness;
     hooks.recalibrate_touch = recalibrate;
     hooks.raw_touch         = lvgl_port_raw_touch;
     hooks.record_stat       = stats_store_record;
@@ -120,5 +127,6 @@ void loop()
 {
     const uint32_t wait_ms = lvgl_port_loop();
     ui::game_screen_tick(millis());
+    puzzle_stock_loop();
     delay(wait_ms < 5 ? wait_ms : 5);
 }

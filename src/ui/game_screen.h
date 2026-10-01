@@ -12,10 +12,15 @@ namespace ui {
 
 struct UiHooks {
     uint32_t (*random_seed)();                 // fresh seed for a new puzzle
+    // A ready-made puzzle for this difficulty, if one is waiting (nullptr or
+    // false = generate it here instead)
+    bool (*take_puzzle)(sudoku::Difficulty, sudoku::Grid& puzzle, sudoku::Grid& solution);
     void (*save)(const game::Game&);           // persist the game now
     void (*save_settings)(const UiSettings&);  // persist theme / input mode
     void (*toggle_invert)();                   // panel color fixes
     void (*toggle_swap_rb)();
+    void (*flash_invert)(bool on);             // solved flash: invert panel briefly
+    void (*set_brightness)(uint8_t level);     // backlight
     void (*recalibrate_touch)();               // may not return (device restarts)
     // Unfiltered touch reading for the touch test (nullptr = not available)
     bool (*raw_touch)(int16_t* x, int16_t* y);

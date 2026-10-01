@@ -40,12 +40,26 @@
   screenshots at 240x320 and 320x480 before shipping UI changes).
 - `src/app/save_store.*` saves the game to LittleFS (`/game.bin`, written
   via temp file + rename).
-- Layout is portrait for now; Tom will decide after seeing it on hardware.
+- Layout is portrait - final (Tom: comfortable one-handed). Don't add
+  landscape.
+- No "tap again" / "are you sure" confirmations, ever. Buttons act on the
+  first tap.
 - UI rules from Tom: strong highlight tints with distinct hues (cheap TN
   panels wash out pale tints at an angle); no shrinking fonts to squeeze
   labels in; menu is a 3-line hamburger in the top bar; colors come from
   `src/ui/theme.cpp` palettes (Light/Dark), never hard-coded elsewhere.
-- Settings the player picks (theme, input mode) are saved by
+- Difficulty = hardest technique needed, from `src/game/grader.*` (L1
+  singles, L2 locked candidates, L3 pairs/triples/X-Wing, L4
+  Swordfish/XY/XYZ-Wing). `generate()` must return a puzzle that grades
+  exactly its level; host tests enforce it. Never go back to clue counts.
+  Calibration tool: `tools/grader_check/` (Sudoku Exchange bank).
+- `src/app/puzzle_stock.*` pre-generates 2 puzzles per level on a core-0
+  idle-priority task (`/puzzle_stock.bin`); UI gets them via
+  `UiHooks::take_puzzle`.
+- Solve flash toggles the panel invert bit (`UiHooks::flash_invert`), no
+  overlay animations. Brightness is a slider in Display & touch, saved in
+  UiSettings (floor kMinBrightness).
+- Settings the player picks (theme, input mode, brightness) are saved by
   `src/app/settings_store.*` (`/ui_settings.bin`). Digit 1st is the default.
 - Stats: `src/game/stats.*` (CSV format + summary, host-tested) and
   `src/app/stats_store.*` (SD `/CYD-Sudoku/stats.csv` if the board's SD is
@@ -62,9 +76,10 @@
   Times feed the stats, so don't add anything that counts unattended time.
 
 ## Known hardware issues
-- Tom's boards: 2.8" ESP32-2432S028 in both ILI9341 and ST7789 versions
+- Supported boards: 2.8" ESP32-2432S028 in ILI9341 and ST7789 versions
   (src/boards/esp32_2432s028.hpp), and "ESP32-32E" display boards 3.2"
-  ST7789, 3.5" ST7796, 4.0" ST7796, all resistive
+  ST7789, 3.5" ST7796, 4.0" ST7796, all resistive. Tom owns the 2.8" ST7789,
+  3.2" and 4.0" only
   (src/boards/esp32_32e_display.hpp). The ESP32-32E boards have no model
   number on the PCB - only text like "3.2" LCD Display, ESP32-32E, 240x320,
   Resistive Touch". They are NOT ESP32-3248S0xx boards; never use that
@@ -76,7 +91,11 @@
 - ESP32-32E boards: touch shares the display's HSPI bus (CS 33); SD is on
   VSPI by itself, so SD works there (BOARD_SD_USABLE 1).
 - 2.8" SD (BOARD_SD_USABLE 0) needs a bit-banged XPT2046 touch driver first;
-  until then stats on the 2.8" go to LittleFS.
+  until then stats on the 2.8" go to LittleFS. Out of scope for v1.0, as is
+  NM-CYD-C5.
+- Tom has NO 2.8" ILI9341 or 3.5" ST7796 unit. Those envs carry
+  `custom_board_tested = no`, which the flasher and README show as
+  "untested". Remove it only when someone reports the board working.
 - Tom uses a Nintendo DS Lite stylus with firm presses - NOT a finger.
   Don't explain touch problems with finger size or light pressure.
 - 4.0" first-tap offset (first tap after idle landed ~1 cell low or right):

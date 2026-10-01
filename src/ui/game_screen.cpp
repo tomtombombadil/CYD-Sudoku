@@ -38,8 +38,6 @@ int  brush_digit  = 0;               // Digit 1st mode: the digit being placed
 int  hint_cell    = -1;              // cell the last Hint tap pointed at
 bool solved_seen  = false;           // solve already celebrated + recorded
 bool idle_paused  = false;           // clock stopped: no touches for a while
-int  menu_armed   = -1;              // menu confirm: -1 none, 0..3 new game level, 10 restart
-constexpr int kArmRestart = 10;
 
 // The clock stops after this long with no touch, so time the board sits on
 // unattended doesn't count. The next touch starts it again.
@@ -207,36 +205,31 @@ void changed()
 }
 
 // ---- Celebration --------------------------------------------------------------
-// Two quick amber flashes over the finished board, then the solved board stays
-// on screen. Nothing else opens; the menu is there when the player wants it.
-lv_obj_t*   flash_obj = nullptr;
+// The panel's colour inversion is toggled a few times (about 1.2 s): an
+// instant whole-screen flash with no redrawing. The solved board then stays
+// on screen; nothing else opens.
 lv_timer_t* flash_timer = nullptr;
-int         flash_step = 0;
+int         flash_step  = 0;
+constexpr int kFlashToggles = 6;              // on/off x3
+constexpr uint32_t kFlashMs = 200;
 
 void flash_cb(lv_timer_t*)
 {
     ++flash_step;
-    if (flash_step >= 4) {
+    const bool on = (flash_step < kFlashToggles) && (flash_step % 2 == 0);
+    if (H.flash_invert) H.flash_invert(on);
+    if (flash_step >= kFlashToggles) {
         lv_timer_delete(flash_timer);
         flash_timer = nullptr;
-        lv_obj_delete(flash_obj);
-        flash_obj = nullptr;
-        return;
     }
-    lv_obj_set_style_bg_opa(flash_obj, (flash_step % 2) ? LV_OPA_TRANSP : LV_OPA_60, 0);
 }
 
 void celebrate()
 {
-    if (flash_obj) return;
-    flash_obj = lv_obj_create(lv_layer_top());
-    lv_obj_remove_style_all(flash_obj);
-    lv_obj_set_size(flash_obj, scr_w, scr_h);
-    lv_obj_set_style_bg_color(flash_obj, pal().key_on, 0);
-    lv_obj_set_style_bg_opa(flash_obj, LV_OPA_60, 0);
-    lv_obj_set_clickable(flash_obj, false);
+    if (flash_timer || !H.flash_invert) return;
     flash_step = 0;
-    flash_timer = lv_timer_create(flash_cb, 180, nullptr);
+    H.flash_invert(true);
+    flash_timer = lv_timer_create(flash_cb, kFlashMs, nullptr);
 }
 
 // ---- Input ------------------------------------------------------------------
@@ -248,9 +241,22 @@ void celebrate()
 void on_cell(int i)
 {
     if (overlay || finished()) return;
-    selected = i;
     hint_cell = -1;
-    if (digit_first() && brush_digit && G->enter(i, brush_digit, notes_mode)) changed();
+    if (digit_first() && G->locked(i)) {
+        // Tapping a fixed digit (given or hinted) picks that digit, the same
+        // as tapping it in the digit row.
+        brush_digit = G->value(i);
+        selected = -1;
+        update();
+        return;
+    }
+    selected = i;
+    if (digit_first() && brush_digit && G->enter(i, brush_digit, notes_mode)) {
+        changed();
+        // That was the last one: nothing left to place, so put the digit
+        // down (its button greys out straight away).
+        if (G->placed_correct(brush_digit) >= 9) brush_digit = 0;
+    }
     update();
 }
 
@@ -297,7 +303,7 @@ void digit_cb(lv_event_t* e) { on_digit(static_cast<int>(reinterpret_cast<intptr
 void tool_cb(lv_event_t* e)
 {
     const intptr_t id = reinterpret_cast<intptr_t>(lv_event_get_user_data(e));
-    if (id == 4) { menu_armed = -1; game_screen_open_menu(); return; }
+    if (id == 4) { game_screen_open_menu(); return; }
     if (finished()) return;
     if (id != 3) hint_cell = -1;
     switch (id) {
@@ -365,24 +371,11 @@ lv_obj_t* overlay_bottom_button(const char* text, lv_event_cb_t cb, intptr_t use
     return b;
 }
 
-// A game counts as in progress once it's been played (moves or 30 s).
-// Leaving one needs a second tap: the first relabels the button "Tap again".
-
+// A game counts as played once it has moves or 30 s on the clock; leaving
+// a played, unsolved game for a new one is recorded as "Gave up".
 bool game_in_progress()
 {
     return G->active() && !G->solved() && (G->can_undo() || G->elapsed_s() >= 30);
-}
-
-// True if the action should go ahead now; otherwise arms it and redraws.
-bool confirm_leave(int which)
-{
-    if (!game_in_progress() || menu_armed == which) {
-        menu_armed = -1;
-        return true;
-    }
-    menu_armed = which;
-    game_screen_open_menu();
-    return false;
 }
 
 void start_new(sudoku::Difficulty d)
@@ -397,15 +390,20 @@ void start_new(sudoku::Difficulty d)
         H.record_stat(r);
     }
 
-    // Expert can take a moment on the ESP32; say so before the work starts.
-    overlay_begin("New game");
-    char msg[48];
-    snprintf(msg, sizeof msg, "Creating a %s puzzle...", sudoku::difficulty_name(d));
-    overlay_text(msg, true);
-    lv_refr_now(nullptr);
-
-    sudoku::Rng rng(H.random_seed ? H.random_seed() : 1);
-    G->start(d, rng);
+    static sudoku::Grid puzzle, solution;
+    if (H.take_puzzle && H.take_puzzle(d, puzzle, solution)) {
+        G->start_with(d, puzzle, solution);           // ready-made: instant
+    } else {
+        // None ready: make one now. Hard/Expert can take a few seconds on
+        // the ESP32, so say so before the work starts.
+        overlay_begin("New game");
+        char msg[48];
+        snprintf(msg, sizeof msg, "Creating a %s puzzle...", sudoku::difficulty_name(d));
+        overlay_text(msg, true);
+        lv_refr_now(nullptr);
+        sudoku::Rng rng(H.random_seed ? H.random_seed() : 1);
+        G->start(d, rng);
+    }
     selected = -1;
     brush_digit = 0;
     hint_cell = -1;
@@ -420,15 +418,13 @@ void start_new(sudoku::Difficulty d)
 
 void new_game_cb(lv_event_t* e)
 {
-    const int d = static_cast<int>(reinterpret_cast<intptr_t>(lv_event_get_user_data(e)));
-    if (confirm_leave(d)) start_new(static_cast<sudoku::Difficulty>(d));
+    start_new(static_cast<sudoku::Difficulty>(reinterpret_cast<intptr_t>(lv_event_get_user_data(e))));
 }
 
 void menu_cb(lv_event_t* e)
 {
     switch (reinterpret_cast<intptr_t>(lv_event_get_user_data(e))) {
         case 0:  // restart puzzle
-            if (!confirm_leave(kArmRestart)) return;
             G->restart();
             selected = -1;
             hint_cell = -1;
@@ -438,8 +434,8 @@ void menu_cb(lv_event_t* e)
             changed();
             update();
             break;
-        case 1: menu_armed = -1; game_screen_open_settings(); break;
-        case 2: menu_armed = -1; game_screen_close_overlays(); update(); break;
+        case 1: game_screen_open_settings(); break;
+        case 2: game_screen_close_overlays(); update(); break;
         case 3: game_screen_open_menu(); break;                // back to the menu
         case 4: if (H.toggle_invert) H.toggle_invert(); break;
         case 5: if (H.toggle_swap_rb) H.toggle_swap_rb(); break;
@@ -453,8 +449,35 @@ void menu_cb(lv_event_t* e)
             save_settings();
             game_screen_open_settings();
             break;
-        case 9: menu_armed = -1; game_screen_open_stats(); break;
+        case 9: game_screen_open_stats(); break;
     }
+}
+
+// Two half-width menu buttons side by side (b may be nullptr: one button)
+void overlay_pair(const char* a, intptr_t ida, const char* b, intptr_t idb)
+{
+    lv_obj_t* row = lv_obj_create(overlay);
+    lv_obj_remove_style_all(row);
+    lv_obj_set_size(row, lv_pct(100), menu_btn_h());
+    lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_style_pad_column(row, 6, 0);
+    lv_obj_set_scrollable(row, false);
+    const char* t[2] = {a, b};
+    const intptr_t id[2] = {ida, idb};
+    for (int k = 0; k < 2; ++k) {
+        if (!t[k]) continue;
+        lv_obj_t* btn = make_key(row, 10, menu_btn_h(), menu_cb, id[k]);
+        lv_obj_set_flex_grow(btn, 1);
+        key_label(btn, t[k], menu_font());
+    }
+}
+
+void brightness_cb(lv_event_t* e)
+{
+    lv_obj_t* sl = lv_event_get_target_obj(e);
+    S.brightness = static_cast<uint8_t>(lv_slider_get_value(sl));
+    if (H.set_brightness) H.set_brightness(S.brightness);
+    if (lv_event_get_code(e) == LV_EVENT_RELEASED) save_settings();
 }
 
 // ---- Stats screen -------------------------------------------------------------
@@ -508,21 +531,13 @@ void stats_table_show(const StatsTable& t, const char* const head[4],
 
 void stats_back_cb(lv_event_t*) { game_screen_open_menu(); }
 
-// Delete last / Clear all: first tap arms the button ("Tap again"), the
-// second does it. Arming one disarms the other.
-int stats_armed = 0;                 // 0 none, 1 delete last, 2 clear all
-
+// Delete last / Clear all act immediately, then the screen redraws.
 void stats_action_cb(lv_event_t* e)
 {
     const int which = static_cast<int>(reinterpret_cast<intptr_t>(lv_event_get_user_data(e)));
-    if (stats_armed != which) {
-        stats_armed = which;
-    } else {
-        stats_armed = 0;
-        if (which == 1 && H.delete_last_stat) H.delete_last_stat();
-        if (which == 2 && H.clear_stats) H.clear_stats();
-    }
-    game_screen_open_stats();        // redraw with new labels / data
+    if (which == 1 && H.delete_last_stat) H.delete_last_stat();
+    if (which == 2 && H.clear_stats) H.clear_stats();
+    game_screen_open_stats();
 }
 
 } // namespace
@@ -758,6 +773,7 @@ void game_screen_create(game::Game& g, const UiHooks& hooks, const UiSettings& s
     S = settings;
     set_theme(S.theme);
     apply_styles();
+    if (H.set_brightness) H.set_brightness(S.brightness);
     selected = -1;
     notes_mode = false;
     brush_digit = 0;
@@ -812,7 +828,7 @@ void game_screen_tap_digit(int d)             { on_digit(d); }
 void game_screen_set_notes(bool on)           { notes_mode = on; update(); }
 void game_screen_menu_tap_new_game(int d)
 {
-    if (confirm_leave(d)) start_new(static_cast<sudoku::Difficulty>(d));
+    start_new(static_cast<sudoku::Difficulty>(d));
 }
 void game_screen_hint()                       { on_hint(); }
 void game_screen_set_input_mode(InputMode m)
@@ -823,10 +839,8 @@ void game_screen_set_input_mode(InputMode m)
 
 void game_screen_open_menu()
 {
-    stats_armed = 0;
     overlay_begin("CYD Sudoku");
-    overlay_text(menu_armed >= 0 ? "Tap again to leave the current game." : "Start a new game:",
-                 menu_armed >= 0);
+    overlay_text("Start a new game:", false);
 
     lv_obj_t* grid = lv_obj_create(overlay);
     lv_obj_remove_style_all(grid);
@@ -838,17 +852,12 @@ void game_screen_open_menu()
     const int half = (scr_w - 2 * (large ? 16 : 10) - 6) / 2;
     for (int d = 0; d < 4; ++d) {
         lv_obj_t* b = make_key(grid, half, menu_btn_h(), new_game_cb, d);
-        if (menu_armed == d) lv_obj_add_state(b, LV_STATE_CHECKED);
-        key_label(b, menu_armed == d ? "Tap again"
-                                     : sudoku::difficulty_name(static_cast<sudoku::Difficulty>(d)),
-                  menu_font());
+        key_label(b, sudoku::difficulty_name(static_cast<sudoku::Difficulty>(d)), menu_font());
     }
-    lv_obj_t* r = overlay_button(overlay, menu_armed == kArmRestart ? "Tap again to restart"
-                                                                    : "Restart this puzzle", menu_cb, 0);
-    if (menu_armed == kArmRestart) lv_obj_add_state(r, LV_STATE_CHECKED);
+    overlay_button(overlay, "Restart this puzzle", menu_cb, 0);
     if (H.load_stats) overlay_button(overlay, "Stats", menu_cb, 9);
     overlay_button(overlay, "Display & touch", menu_cb, 1);
-    overlay_button(overlay, "Back to game", menu_cb, 2, menu_armed < 0);
+    overlay_button(overlay, "Back to game", menu_cb, 2, true);
 }
 
 void game_screen_open_settings()
@@ -857,10 +866,44 @@ void game_screen_open_settings()
     char theme_txt[32];
     snprintf(theme_txt, sizeof theme_txt, "Theme: %s", theme_name(S.theme));
     overlay_button(overlay, theme_txt, menu_cb, 8);
-    overlay_button(overlay, "Invert panel colors", menu_cb, 4);
-    overlay_button(overlay, "Swap red and blue", menu_cb, 5);
-    overlay_button(overlay, "Recalibrate touch", menu_cb, 6);
-    if (H.raw_touch) overlay_button(overlay, "Touch test", menu_cb, 7);
+
+    // Brightness: label + slider, applied while dragging, saved on release
+    lv_obj_t* row = lv_obj_create(overlay);
+    lv_obj_remove_style_all(row);
+    lv_obj_set_size(row, lv_pct(100), menu_btn_h());
+    lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_column(row, large ? 14 : 10, 0);
+    lv_obj_set_scrollable(row, false);
+    lv_obj_t* bl = lv_label_create(row);
+    lv_label_set_text(bl, "Brightness");
+    lv_obj_set_style_text_font(bl, menu_font(), 0);
+    lv_obj_set_style_text_color(bl, pal().ink, 0);
+    lv_obj_t* sl = lv_slider_create(row);
+    lv_obj_remove_style_all(sl);
+    lv_obj_set_flex_grow(sl, 1);
+    lv_obj_set_height(sl, large ? 12 : 10);
+    lv_obj_set_style_margin_right(sl, large ? 14 : 10, 0);  // room for the knob
+    lv_obj_set_style_bg_color(sl, pal().key_border, LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(sl, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_radius(sl, LV_RADIUS_CIRCLE, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(sl, pal().key_on, LV_PART_INDICATOR);
+    lv_obj_set_style_bg_opa(sl, LV_OPA_COVER, LV_PART_INDICATOR);
+    lv_obj_set_style_radius(sl, LV_RADIUS_CIRCLE, LV_PART_INDICATOR);
+    lv_obj_set_style_bg_color(sl, pal().ink, LV_PART_KNOB);
+    lv_obj_set_style_bg_opa(sl, LV_OPA_COVER, LV_PART_KNOB);
+    lv_obj_set_style_radius(sl, LV_RADIUS_CIRCLE, LV_PART_KNOB);
+    lv_obj_set_style_pad_all(sl, large ? 9 : 7, LV_PART_KNOB);   // knob size
+    lv_obj_set_ext_click_area(sl, large ? 16 : 12);               // easy to grab
+    lv_slider_set_range(sl, kMinBrightness, 255);
+    lv_slider_set_value(sl, S.brightness, LV_ANIM_OFF);
+    lv_obj_add_event_cb(sl, brightness_cb, LV_EVENT_VALUE_CHANGED, nullptr);
+    lv_obj_add_event_cb(sl, brightness_cb, LV_EVENT_RELEASED, nullptr);
+
+    // Full width each: "Swap red/blue" doesn't fit half a row at the menu font.
+    overlay_pair("Invert colors", 4, nullptr, 0);
+    overlay_pair("Swap red/blue", 5, nullptr, 0);
+    overlay_pair("Recalibrate", 6, H.raw_touch ? "Touch test" : nullptr, 7);
     overlay_button(overlay, "Back", menu_cb, 3, true);
     char info[96];
     snprintf(info, sizeof info, "%s, firmware %s", H.board_name ? H.board_name : "",
@@ -927,16 +970,12 @@ void game_screen_open_stats()
         lv_obj_set_style_pad_column(row, 6, 0);
         lv_obj_set_clickable(row, false);
         lv_obj_set_scrollable(row, false);
-        const char* labels[2] = {stats_armed == 1 ? "Tap again" : "Delete last",
-                                 stats_armed == 2 ? "Tap again" : "Clear all"};
+        const char* labels[2] = {"Delete last", "Clear all"};
         for (int k = 0; k < 2; ++k) {
             lv_obj_t* b = make_key(row, 10, bh, stats_action_cb, k + 1);
             lv_obj_set_flex_grow(b, 1);
-            if (stats_armed == k + 1) lv_obj_add_state(b, LV_STATE_CHECKED);
             key_label(b, labels[k], menu_font());
         }
-    } else {
-        stats_armed = 0;
     }
 }
 

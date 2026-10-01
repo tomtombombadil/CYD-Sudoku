@@ -13,6 +13,14 @@ void Game::start(Difficulty d, sudoku::Rng& rng)
     restart();
 }
 
+void Game::start_with(Difficulty d, const sudoku::Grid& puzzle, const sudoku::Grid& solution)
+{
+    diff_ = d;
+    puzzle_ = puzzle;
+    solution_ = solution;
+    restart();
+}
+
 void Game::restart()
 {
     for (int i = 0; i < N; ++i) { value_[i] = puzzle_.c[i]; notes_[i] = 0; hinted_[i] = 0; }

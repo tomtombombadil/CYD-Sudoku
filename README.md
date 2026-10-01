@@ -2,8 +2,8 @@
 
 A polished, touch-friendly Sudoku for the ESP32 "Cheap Yellow Display" family.
 
-> **Status:** first playable alpha (portrait layout). Puzzles are generated on
-> the device; see [docs/SPEC.md](docs/SPEC.md) for what's done and planned.
+> **Status:** feature-complete beta, heading for v1.0. Puzzles are generated
+> and graded on the device; see [docs/SPEC.md](docs/SPEC.md) for details.
 
 ## How to play
 
@@ -14,7 +14,9 @@ the tool row (**Undo**, **Notes**, input mode, **Hint**); the digits 1-9.
   Remembered between games. **Digit 1st** is the default.
   - **Digit 1st:** tap a digit, then tap cells to place it. Tap a cell that
     already holds that digit to clear it; a different digit is replaced.
-    Picking a digit clears the cell highlight.
+    Tap a given (black) digit to pick that digit. Picking a digit clears the
+    cell highlight. When the last of a digit is placed it greys out and is
+    deselected.
   - **Cell 1st:** tap a cell, then a digit. Tap the same digit again to
     clear it.
 - **Notes:** while on, digits add or remove pencil marks instead of answers.
@@ -35,13 +37,29 @@ the tool row (**Undo**, **Notes**, input mode, **Hint**); the digits 1-9.
   stops and the top bar says **Paused**; the next touch starts it again. It
   can't run while the board is unplugged (the board has no clock battery),
   and it stops while the menu is open.
-- **Solving** flashes the screen twice and leaves the finished board on
-  screen. Open the ☰ menu when you're ready for a new game.
+- **Solving** flashes the screen (colors invert a few times) and leaves the
+  finished board on screen. Open the ☰ menu when you're ready for a new game.
 - **☰ menu:** new game (Easy, Medium, Hard, Expert), restart, **Stats**, and
-  **Display & touch** (Light/Dark theme, panel color fixes, touch
-  calibration, touch test). Starting a new game or restarting while a game
-  is in progress asks for a second tap. The game saves itself and picks up
-  where you left off.
+  **Display & touch** (Light/Dark theme, brightness, panel color fixes,
+  touch calibration, touch test). Buttons act on the first tap; nothing asks
+  "are you sure". The game saves itself and picks up where you left off.
+
+## Difficulty
+
+Every puzzle has exactly one solution, and its level is set by the hardest
+solving technique it needs (checked by a built-in solver that works the way
+a person does):
+
+| Level | Needs | Never needs |
+|---|---|---|
+| Easy | naked and hidden singles only (36+ clues) | anything else |
+| Medium | pointing / claiming (locked candidates) | pairs, triples, fish |
+| Hard | naked/hidden pairs and triples, X-Wing | Swordfish, wings |
+| Expert | Swordfish, XY-Wing or XYZ-Wing | chains or guessing |
+
+No puzzle ever needs guessing. The grader was checked against 8,000 rated
+puzzles from the public Sudoku Exchange puzzle bank. The board keeps two
+puzzles of each level ready in the background, so new games start at once.
 
 ## Stats
 
@@ -49,8 +67,7 @@ Every solved puzzle is recorded with its difficulty, time and hints used. So
 is every puzzle you leave for a new game after playing it (marked "Gave up").
 The Stats screen shows solves, average and best time per difficulty, and
 your most recent games. **Delete last** removes the most recent entry (for a
-game recorded by mistake) and **Clear all** wipes the history; each needs a
-second tap to confirm.
+game recorded by mistake) and **Clear all** wipes the history.
 
 - **With a microSD card** (3.2", 3.5" and 4.0" boards): saved to
   `CYD-Sudoku/stats.csv` on the card, full history, opens in Excel.
@@ -80,9 +97,12 @@ text printed on the back of the board.
 | `CYD_3.5in_ST7796_Resistive.bin` | 3.5" LCD Display, ESP32-32E, 320x480, Resistive Touch |
 | `CYD_4.0in_ST7796_Resistive.bin` | 4.0" LCD Display, ESP32-32E, 320x480, Resistive Touch |
 
-Confirmed working: 2.8" ST7789, 3.2" ST7789, 4.0" ST7796. The 2.8" ILI9341
-and 3.5" ST7796 builds haven't been tested on hardware yet. NM-CYD-C5
-(ESP32-C5) support is planned.
+Confirmed working: 2.8" ST7789, 3.2" ST7789, 4.0" ST7796.
+
+**Untested:** the 2.8" ILI9341 and 3.5" ST7796 builds use the same code and
+pin maps as their tested siblings but haven't been run on that hardware.
+They should work; please [open an issue](../../issues) either way. NM-CYD-C5
+(ESP32-C5) support may come after v1.0.
 
 Not sure which 2.8" you have? Try ILI9341 first. Wrong colors: see below.
 Garbled or blank screen: install the other 2.8" version.
@@ -96,17 +116,22 @@ Garbled or blank screen: install the other 2.8" version.
 4. Click **Build** (✓), then **Upload** (→) with the board plugged in.
 5. **Serial Monitor** (plug icon) shows boot logs at 115200 baud.
 
+## Brightness
+
+**☰ → Display & touch → Brightness** sets the backlight. It never goes fully
+dark, and it's remembered.
+
 ## Touch calibration
 
 On first boot (or when the **BOOT** button is held while powering on), the
 screen shows corner arrows — tap each tip precisely. The calibration is saved
-to flash and reused. To redo it: **☰ → Display & touch → Recalibrate touch**.
+to flash and reused. To redo it: **☰ → Display & touch → Recalibrate**.
 
 ## Colors look wrong?
 
 Panels vary between production runs. Open **☰ → Display & touch**: use
-**Invert panel colors** if colors look like a photo negative, and **Swap red
-and blue** if the blue digits show as red. The fix is saved on the board.
+**Invert colors** if colors look like a photo negative, and **Swap red/blue**
+if the blue digits show as red. The fix is saved on the board.
 For a dark screen on purpose, use **Theme: Dark** instead.
 
 ## License

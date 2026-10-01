@@ -18,7 +18,9 @@ enum class InputMode : uint8_t { CellFirst = 0, DigitFirst = 1 };
 struct UiSettings {
     Theme     theme = Theme::Light;
     InputMode input = InputMode::DigitFirst;   // Tom's choice for the default
+    uint8_t   brightness = 200;                // backlight, kMinBrightness..255
 };
+constexpr uint8_t kMinBrightness = 20;         // never let the screen go fully dark
 
 struct Palette {
     lv_color_t screen, cell, line_thin, line_thick;

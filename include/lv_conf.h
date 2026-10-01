@@ -59,6 +59,10 @@
 #define LV_FONT_MONTSERRAT_28 1
 #define LV_FONT_DEFAULT LV_FONT_DEFAULT_MONTSERRAT_20
 
+/* ---- Widgets used besides the defaults ----------------------------------- */
+#define LV_USE_BAR    1                   /* needed by the slider */
+#define LV_USE_SLIDER 1                   /* brightness */
+
 /* ---- Features not used --------------------------------------------------- */
 #define LV_USE_LOVYAN_GFX 0               /* we use our own glue in lvgl_port.cpp */
 #define LV_BUILD_EXAMPLES 0

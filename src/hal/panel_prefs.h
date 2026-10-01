@@ -17,5 +17,9 @@ void panel_prefs_begin(LGFX& gfx);
 
 const PanelPrefs& panel_prefs_get();
 
+// Briefly show the panel inverted (on) or normal (off), without saving.
+// Used for the "solved" flash.
+void panel_prefs_flash(LGFX& gfx, bool on);
+
 // Change, apply immediately and save. The caller should redraw afterwards.
 void panel_prefs_set(LGFX& gfx, const PanelPrefs& prefs);

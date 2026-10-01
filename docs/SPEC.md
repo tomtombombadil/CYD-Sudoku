@@ -32,24 +32,23 @@ display's SPI bus).
 Built and working: everything in sections 3 and 5, stats, hints, themes,
 idle-paused clock, web flasher, five board builds.
 
-Open before v1.0 (Tom to decide which are in scope):
-- [ ] Section 4 fallback: puzzle packs on LittleFS (not built; on-device
-      generation has been reliable, so this may be dropped or replaced by
-      technique-based difficulty grading).
-- [ ] Difficulty graded only by clue count; no solving-technique grading.
-- [ ] Highlighting: in Digit 1st with a digit picked, tapping a placed digit
-      doesn't switch the highlight to that digit.
-- [ ] Portrait vs landscape decision (Tom).
-- [ ] Hardware test of the 2.8" ILI9341 and 3.5" ST7796 builds.
-- [ ] SD card on the 2.8" boards (needs a bit-banged touch driver).
-- [ ] NM-CYD-C5 board (stretch goal).
+Decided for v1.0 (Tom, 2026-10-01):
+- [x] Difficulty graded by solving technique (section 4), replacing clue
+      counts. Puzzle packs dropped: graded generation does the job.
+- [x] Digit 1st: tapping a given picks that digit.
+- [x] Portrait is final ("easy to hold in one hand and play with the other").
+- [x] No "tap again" confirmations anywhere.
+- [x] Solve flash = panel invert toggled; brightness slider.
+- [x] 2.8" ILI9341 and 3.5" ST7796 ship untested, marked as such on the
+      flasher and in the README.
+- Out of scope for v1.0: SD on the 2.8" boards, NM-CYD-C5.
+
+Remaining: Tom's hardware test of this build, then he says when to cut
+v1.0.0.
 
 ## 3. Core mechanics & UX
 
-**Status (v0.1.0-alpha.7):** first pass of everything below is in.
-Layout is **portrait** for now (Tom will decide after living with it).
-Difficulty is by clue count only (Easy ~38, Medium ~32, Hard ~28,
-Expert 24-26); grading by solving technique is planned.
+Layout is **portrait** (final).
 
 Layout, top to bottom (all screen sizes):
 1. Top bar: clock (left), difficulty / "Solved!" / hint prompt (centred),
@@ -67,17 +66,22 @@ Decisions from Tom's testing:
 - (alpha.6) Input mode is a single button showing the current mode, not a
   two-part selector. **Digit 1st is the default.**
 - (alpha.6) In Digit 1st, picking a digit clears the cell highlight.
-- (alpha.6) Solving: flash the screen twice, then leave the finished board
-  on screen. No dialog, no jump to the menu.
+- (alpha.6) Solving: flash the screen, then leave the finished board on
+  screen. No dialog, no jump to the menu. (v1.0) The flash toggles the
+  panel's invert bit 6 times, 200 ms apart (not an overlay - too slow).
 - (alpha.6) Hint: two taps (point, then fill). Target order: selected cell
   if empty/wrong, any wrong entry, easiest empty cell. Hinted digits are
   green, locked, undoable, and counted.
 - (alpha.7) Clock pauses after 2 minutes without a touch (top bar shows
   "Paused"); it also stops while the menu is open. Off time can't be counted
   (no RTC battery); unattended powered-on time was the stats problem.
-- (post alpha.8) Stats screen: "Delete last" and "Clear all", each needing a
-  second tap ("Tap again"). New game and Restart need a second tap while a
-  game is in progress (moves made or 30 s played).
+- (post alpha.8) Stats screen: "Delete last" and "Clear all".
+- (v1.0) No confirmation taps anywhere ("this isn't a banking app"): New
+  game, Restart, Delete last and Clear all act on the first tap. Hint's
+  point-then-fill is a feature, not a confirmation.
+- (v1.0) Digit 1st: tapping a given picks its digit. Placing the last of a
+  digit greys its button and deselects it at once.
+- (v1.0) Display & touch has a brightness slider (saved; floor 20/255).
 - (alpha.6) Stats: record Solved and Gave up (leaving a played puzzle for a
   new one) with difficulty, time, hints. CSV on SD where usable, else
   LittleFS. Stats screen: per-difficulty solved / average / best, and the
@@ -91,9 +95,26 @@ Decisions from Tom's testing:
 - **Number exhaustion:** a digit button dims once that digit is correctly placed 9 times; its counter shows how many are left to place.
 - **Undo & persistence:** move stack for undo; board + undo stack saved to LittleFS periodically so the game resumes after power loss.
 
-## 4. Puzzle sourcing
-- **Primary:** on-device generation — fill a full grid (backtracking or DLX), then dig holes, checking uniqueness with the solver after each removal.
-- **Fallback:** puzzle packs on LittleFS in a compact binary format, built from a public-domain puzzle bank.
+## 4. Puzzle sourcing and difficulty
+- On-device generation: fill a random full grid, then remove symmetric pairs
+  of clues while the puzzle stays solvable by the techniques its level allows
+  (which also guarantees a unique solution). Retry until it actually needs
+  its level's technique.
+- Grader (`src/game/grader.*`): solves like a person, easiest technique
+  first; level = hardest technique used.
+  - L1 Easy: naked/hidden singles, 36+ clues.
+  - L2 Medium: + pointing/claiming, 30+ clues.
+  - L3 Hard: + naked/hidden pairs and triples, X-Wing.
+  - L4 Expert: + Swordfish, XY-Wing, XYZ-Wing. Nothing needs chains or
+    guessing.
+- Calibrated on 8,000 Sudoku Exchange bank puzzles (`tools/grader_check/`):
+  level rises with their rating, every logical solve matched the true
+  solution.
+- Hard/Expert can take a while on the ESP32, so `src/app/puzzle_stock.*`
+  keeps 2 per level ready (background task on core 0, lowest priority,
+  saved to `/puzzle_stock.bin`). If the stock is empty the game generates
+  on the spot with a "Creating…" overlay.
+- No puzzle packs: dropped for v1.0.
 
 ## 5. Distribution
 - Web flasher (ESP Web Tools on GitHub Pages): https://tomtombombadil.github.io/CYD-Sudoku/ — Chrome/Edge, no software needed.
