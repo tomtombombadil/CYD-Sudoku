@@ -60,7 +60,11 @@ only. Update `THIRD_PARTY_NOTICES.md` whenever code is brought in.
   and redeploys the web flasher (GitHub Pages,
   https://tomtombombadil.github.io/CYD-Sudoku/) with that build
   (version `dev-<sha>`).
-- Tag `vX.Y.Z`: same, plus a GitHub release with the `.bin` files
-  (merged factory images, flash at 0x0). Tags with a hyphen are pre-releases.
+- Releases: Actions tab -> Build -> "Run workflow" on main with
+  `release_tag` = `vX.Y.Z` (hyphen = pre-release). The workflow creates the
+  tag and a GitHub release with the `.bin` files (merged factory images,
+  flash at 0x0). Claude's sessions cannot push tags (proxy returns 403), so
+  Claude releases via this dispatch, not `git push --tags`. Pushing a `v*`
+  tag from Tom's machine also works.
 - Site source: `web/index.html`; assembled by `tools/make_site.py`.
 - Only give an env `custom_firmware_name` once its board file exists.

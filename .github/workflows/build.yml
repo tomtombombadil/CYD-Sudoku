@@ -5,7 +5,14 @@ on:
     branches: [main]
     tags: ['v*']
   pull_request:
+  # "Run workflow" button on the Actions tab. Fill in a tag (e.g. v0.2.0)
+  # to publish a release from the current main; leave empty for a plain build.
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release tag to create, e.g. v0.2.0 (hyphen = pre-release). Leave empty to just build.'
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -31,8 +38,15 @@ jobs:
           print("matrix=" + json.dumps({"include": inc}))
           EOF
       - id: ver
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+          if [[ -n "$RELEASE_TAG" ]]; then
+            if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]; then
+              echo "::error::release_tag must look like v1.2.3 or v1.2.3-beta.1"; exit 1
+            fi
+            echo "version=${RELEASE_TAG}" >> "$GITHUB_OUTPUT"
+          elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             echo "version=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
           else
             echo "version=dev-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
@@ -77,10 +91,10 @@ jobs:
           name: fw-${{ matrix.env }}
           path: out/*.bin
 
-  # Tagged builds become a GitHub release. Tags with a hyphen
-  # (v0.1.0-alpha.1) are marked pre-release.
+  # Tag pushes, or "Run workflow" with a release_tag, become a GitHub
+  # release. Tags with a hyphen (v0.1.0-alpha.1) are marked pre-release.
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || inputs.release_tag != ''
     needs: [boards, build]
     runs-on: ubuntu-latest
     permissions:
@@ -92,8 +106,11 @@ jobs:
           merge-multiple: true
       - uses: softprops/action-gh-release@v2
         with:
+          # Creates the tag on this commit when started from "Run workflow"
+          tag_name: ${{ needs.boards.outputs.version }}
+          target_commitish: ${{ github.sha }}
           files: out/*.bin
-          prerelease: ${{ contains(github.ref_name, '-') }}
+          prerelease: ${{ contains(needs.boards.outputs.version, '-') }}
           generate_release_notes: true
           body: |
             **Easiest install:** https://tomtombombadil.github.io/CYD-Sudoku/ (Chrome or Edge).
@@ -103,7 +120,7 @@ jobs:
 
   # Web flasher on GitHub Pages: always the newest build from main or a tag.
   pages:
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     needs: [boards, build]
     runs-on: ubuntu-latest
     permissions:
