@@ -57,6 +57,9 @@
   check it when adding screens, and keep tables as one label per column
   rather than objects per cell.
 - Game saves are format 'SUD2' (adds hints); 'SUD1' still loads.
+- Game clock: counts only while the game screen is up AND there was a touch
+  in the last 2 minutes (kIdlePauseMs, via lv_display_get_inactive_time).
+  Times feed the stats, so don't add anything that counts unattended time.
 
 ## Known hardware issues
 - Tom's boards: 2.8" ESP32-2432S028 in both ILI9341 and ST7789 versions

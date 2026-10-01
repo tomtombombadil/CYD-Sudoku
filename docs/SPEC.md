@@ -55,6 +55,9 @@ Decisions from Tom's testing:
 - (alpha.6) Hint: two taps (point, then fill). Target order: selected cell
   if empty/wrong, any wrong entry, easiest empty cell. Hinted digits are
   green, locked, undoable, and counted.
+- (alpha.7) Clock pauses after 2 minutes without a touch (top bar shows
+  "Paused"); it also stops while the menu is open. Off time can't be counted
+  (no RTC battery); unattended powered-on time was the stats problem.
 - (alpha.6) Stats: record Solved and Gave up (leaving a played puzzle for a
   new one) with difficulty, time, hints. CSV on SD where usable, else
   LittleFS. Stats screen: per-difficulty solved / average / best, and the

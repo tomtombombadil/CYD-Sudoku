@@ -37,6 +37,11 @@ bool notes_mode   = false;
 int  brush_digit  = 0;               // Digit 1st mode: the digit being placed
 int  hint_cell    = -1;              // cell the last Hint tap pointed at
 bool solved_seen  = false;           // solve already celebrated + recorded
+bool idle_paused  = false;           // clock stopped: no touches for a while
+
+// The clock stops after this long with no touch, so time the board sits on
+// unattended doesn't count. The next touch starts it again.
+constexpr uint32_t kIdlePauseMs = 2 * 60 * 1000;
 
 // Timing
 bool     dirty = false;
@@ -133,6 +138,7 @@ void update_status()
     stats::format_time(t, sizeof t, G->elapsed_s());
     lv_label_set_text(clock_l, t);
     if (finished())          lv_label_set_text(center_l, "Solved!");
+    else if (idle_paused)    lv_label_set_text(center_l, "Paused");
     else if (hint_cell >= 0) lv_label_set_text(center_l, "Tap Hint to fill");
     else                     lv_label_set_text(center_l, sudoku::difficulty_name(G->difficulty()));
 }
@@ -732,17 +738,23 @@ void game_screen_tick(uint32_t now_ms)
 {
     now_cache = now_ms;
     if (!G) return;
+    // Idle pause: LVGL tracks the time since the last touch
+    const bool idle = lv_display_get_inactive_time(lv_display_get_default()) >= kIdlePauseMs;
+    if (idle != idle_paused) {
+        idle_paused = idle;
+        update_status();
+    }
     if (last_sec_ms == 0) last_sec_ms = now_ms;
     if (now_ms - last_sec_ms >= 1000) {
         last_sec_ms += 1000;
-        if (!overlay && G->active() && !G->solved()) {
+        if (!overlay && !idle_paused && G->active() && !G->solved()) {
             G->add_second();
             update_status();
         }
     }
     // Save 1.5 s after the last move, and every 30 s of play for the clock.
     const bool due = (dirty && now_ms - dirty_ms >= 1500)
-                  || (now_ms - last_save_ms >= 30000 && G->active() && !G->solved());
+                  || (now_ms - last_save_ms >= 30000 && !idle_paused && G->active() && !G->solved());
     if (due && H.save) {
         H.save(*G);
         dirty = false;

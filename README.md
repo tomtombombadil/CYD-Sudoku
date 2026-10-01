@@ -31,6 +31,10 @@ the tool row (**Undo**, **Notes**, input mode, **Hint**); the digits 1-9.
   board can be bigger.
 - Clashing digits are tinted red. A digit button greys out once all nine are
   placed correctly.
+- **The clock** only runs while you play. After 2 minutes with no touch it
+  stops and the top bar says **Paused**; the next touch starts it again. It
+  can't run while the board is unplugged (the board has no clock battery),
+  and it stops while the menu is open.
 - **Solving** flashes the screen twice and leaves the finished board on
   screen. Open the ☰ menu when you're ready for a new game.
 - **☰ menu:** new game (Easy, Medium, Hard, Expert), restart, **Stats**, and
