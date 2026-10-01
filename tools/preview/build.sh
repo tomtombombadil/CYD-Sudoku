@@ -12,5 +12,5 @@ for f in $(find "$LVGL/src" -name '*.c'); do
 done
 wait
 g++ -std=c++17 -O1 -Wall -DLV_CONF_INCLUDE_SIMPLE -I"$ROOT/include" -I"$LVGL" -I"$ROOT/src" \
-  "$ROOT/tools/preview/preview.cpp" "$ROOT/src/ui/game_screen.cpp" "$ROOT/src/ui/board_view.cpp" \
+  "$ROOT/tools/preview/preview.cpp" "$ROOT/src/ui/game_screen.cpp" "$ROOT/src/ui/board_view.cpp" "$ROOT/src/ui/theme.cpp" \
   "$ROOT/src/game/game.cpp" "$ROOT/src/game/sudoku.cpp" "$OUT"/obj/*.o -lm -o "$OUT/preview"

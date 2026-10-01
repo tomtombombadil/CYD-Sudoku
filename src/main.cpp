@@ -3,6 +3,7 @@
 #include <esp_random.h>
 #include <lvgl.h>
 #include "app/save_store.h"
+#include "app/settings_store.h"
 #include "game/game.h"
 #include "hal/lvgl_port.h"
 #include "hal/panel_prefs.h"
@@ -23,6 +24,8 @@ game::Game the_game;               // ~4 KB: static, not on the task stack
 
 uint32_t hw_seed() { return esp_random(); }
 
+// Panel color fixes change how the hardware shows every pixel; the image in
+// LVGL is unchanged, so a full redraw pushes it out again.
 void redraw_all()
 {
     lv_obj_invalidate(lv_screen_active());
@@ -77,13 +80,14 @@ void setup()
     ui::UiHooks hooks{};
     hooks.random_seed       = hw_seed;
     hooks.save              = save_store_save;
+    hooks.save_settings     = settings_store_save;
     hooks.toggle_invert     = toggle_invert;
     hooks.toggle_swap_rb    = toggle_swap_rb;
     hooks.recalibrate_touch = recalibrate;
     hooks.raw_touch         = lvgl_port_raw_touch;
     hooks.firmware_version  = CYD_SUDOKU_VERSION;
     hooks.board_name        = BOARD_NAME;
-    ui::game_screen_create(the_game, hooks);
+    ui::game_screen_create(the_game, hooks, settings_store_load());
 }
 
 void loop()

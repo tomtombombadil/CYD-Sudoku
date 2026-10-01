@@ -39,6 +39,8 @@ public:
     bool        conflict(int i) const;
     // How many of digit d are placed correctly (9 = digit finished).
     int         placed_correct(int d) const;
+    // How many cells hold digit d right now, right or wrong, givens included.
+    int         count(int d) const;
     bool        solved() const;
     bool        can_undo() const      { return undo_n_ > 0; }
     uint32_t    elapsed_s() const     { return elapsed_s_; }

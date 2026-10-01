@@ -29,21 +29,34 @@ display's SPI bus).
 
 ## 3. Core mechanics & UX
 
-**Status (v0.1.0-alpha.3):** all items below are implemented in a first
-pass. Layout is **portrait** for now (Tom's call: decide after seeing it on
-hardware). Difficulty is by clue count only (Easy ~38, Medium ~32,
-Hard ~28, Expert 24-26); grading by solving technique is planned.
+**Status (v0.1.0-alpha.6):** first pass of everything below is in.
+Layout is **portrait** for now (Tom will decide after living with it).
+Difficulty is by clue count only (Easy ~38, Medium ~32, Hard ~28,
+Expert 24-26); grading by solving technique is planned.
 
-Layout, top to bottom: status line (difficulty + clock; only where there's
-room, i.e. 320x480), board, tool row (Undo, Erase, Notes, Brush, Menu),
-digit row 1-9 (with "remaining" counts where there's room).
+Layout, top to bottom (all screen sizes):
+1. Top bar: clock (left), difficulty (centred), 3-line hamburger menu (right).
+2. Board.
+3. Tool row: **Undo**, **Notes**, input mode selector **Cell | Digit**
+   (full "Cell first / Digit first" only if it fits at the row's font size).
+4. Digit row 1-9, each with a "left to place" count.
+
+Decisions from Tom's testing (alpha.5):
+- Erase button removed: tapping the same digit clears a cell in either mode.
+- Undo kept (this spec requires it); Tom may still drop it.
+- Brush toggle replaced by an explicit, saved input-mode selector.
+- Highlight tints must be strong: CYD TN panels wash out pale tints off-angle.
+  Row/col/box = blue-grey, same digit = yellow, selected = amber.
+- Light/Dark theme in Display & touch, saved on the device.
+- Digit counters = 9 minus that digit's count on the board (right or wrong);
+  the button dims only when all nine are placed correctly.
 
 - **Dual input modes**
   - *Cell-first:* select a cell, then tap a digit in the 1–9 bank.
   - *Digit-first (brush):* select a digit, then tap cells to place it.
 - **Pencil marks:** toggle answer / notes mode. *Auto-clear:* placing a final digit removes it from notes in the same row, column and box.
 - **Highlighting:** selected cell's row, column and box get a soft background; tapping a placed digit highlights every matching digit.
-- **Number exhaustion:** a digit button dims once that digit is placed 9 times.
+- **Number exhaustion:** a digit button dims once that digit is correctly placed 9 times; its counter shows how many are left to place.
 - **Undo & persistence:** move stack for undo; board + undo stack saved to LittleFS periodically so the game resumes after power loss.
 
 ## 4. Puzzle sourcing

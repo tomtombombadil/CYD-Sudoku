@@ -48,6 +48,21 @@ int main()
     CHECK(!g.enter(empty, 2, true));
     CHECK(g.erase(empty) && g.value(empty) == 0);
 
+    // count() includes wrong entries; placed_correct() does not
+    {
+        int wrong_digit = 0;
+        sudoku::Grid pz{}, sl{};
+        for (int i = 0; i < N; ++i) pz.c[i] = g.given(i) ? g.value(i) : 0;
+        sudoku::count_solutions(pz, 2, &sl);
+        wrong_digit = sl.c[empty] % 9 + 1;           // any digit but the right one
+        const int before_count = g.count(wrong_digit), before_ok = g.placed_correct(wrong_digit);
+        g.enter(empty, wrong_digit, false);
+        CHECK(g.count(wrong_digit) == before_count + 1);
+        CHECK(g.placed_correct(wrong_digit) == before_ok);
+        g.undo();
+        CHECK(g.count(wrong_digit) == before_count);
+    }
+
     // Conflicts: put the same digit as a given peer into the cell
     int clash_digit = 0;
     for (int j = 0; j < N; ++j) if (g.given(j) && sudoku::same_unit(empty, j)) { clash_digit = g.value(j); break; }

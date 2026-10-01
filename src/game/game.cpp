@@ -38,6 +38,13 @@ int Game::placed_correct(int d) const
     return n;
 }
 
+int Game::count(int d) const
+{
+    int n = 0;
+    for (int i = 0; i < N; ++i) n += (value_[i] == d);
+    return n;
+}
+
 bool Game::solved() const
 {
     if (!active_) return false;

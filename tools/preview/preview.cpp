@@ -94,38 +94,50 @@ int main(int argc, char** argv)
     hooks.raw_touch = fake_touch;
     hooks.firmware_version = "preview";
     hooks.board_name = "Preview";
-    ui::game_screen_create(g, hooks);
+    ui::UiSettings settings;
+    ui::game_screen_create(g, hooks, settings);
 
-    // 1. Cell selected that holds a digit -> row/col/box + same digits
     int with_value = -1;
-    for (int i = 40; i < 81; ++i) if (g.value(i)) { with_value = i; break; }
-    ui::game_screen_tap_cell(with_value);
-    shot(out + "_1_select.ppm");
-
-    // 2. A conflicting entry
+    for (int i = 40; i < 81; ++i) if (g.value(i) && !g.given(i)) { with_value = i; break; }
     int clash = 0;
     for (int j = 0; j < 81; ++j) if (g.given(j) && sudoku::same_unit(first_empty, j)) { clash = g.value(j); break; }
-    ui::game_screen_tap_cell(first_empty);
-    ui::game_screen_tap_digit(clash);
-    shot(out + "_2_conflict.ppm");
 
-    // 3. Brush mode with digit 5 picked, notes on
-    ui::game_screen_set_brush(true);
-    ui::game_screen_tap_digit(5);
-    ui::game_screen_set_notes(true);
-    shot(out + "_3_brush_notes.ppm");
-    ui::game_screen_set_notes(false);
-    ui::game_screen_set_brush(false);
+    for (int t = 0; t < 2; ++t) {
+        const std::string pre = out + (t ? "_dark" : "_light");
+        ui::game_screen_set_theme(t ? ui::Theme::Dark : ui::Theme::Light);
+        ui::game_screen_set_input_mode(ui::InputMode::CellFirst);
 
-    ui::game_screen_open_menu();
-    shot(out + "_4_menu.ppm");
-    ui::game_screen_open_settings();
-    shot(out + "_5_settings.ppm");
+        // 1. Cell-first, a cell with a digit selected: row/col/box + same digits
+        ui::game_screen_tap_cell(with_value);
+        shot(pre + "_1_select.ppm");
+
+        // 2. A clashing entry
+        ui::game_screen_tap_cell(first_empty);
+        ui::game_screen_tap_digit(clash);
+        shot(pre + "_2_conflict.ppm");
+        ui::game_screen_tap_digit(clash);           // same digit again clears it
+
+        // 3. Digit first with 5 picked, notes on
+        ui::game_screen_set_input_mode(ui::InputMode::DigitFirst);
+        ui::game_screen_tap_digit(5);
+        ui::game_screen_set_notes(true);
+        shot(pre + "_3_digit_first_notes.ppm");
+        ui::game_screen_set_notes(false);
+        ui::game_screen_tap_digit(5);
+
+        ui::game_screen_open_menu();
+        shot(pre + "_4_menu.ppm");
+        ui::game_screen_open_settings();
+        shot(pre + "_5_settings.ppm");
+        ui::game_screen_close_overlays();
+        fake_ms += 50; lv_timer_handler();
+    }
+
     ui::game_screen_open_touch_test();
     for (fake_step = 0; fake_step < 3 * 14; ++fake_step) { fake_ms += 10; lv_timer_handler(); }
     fake_step = -1;
     for (int k = 0; k < 5; ++k) { fake_ms += 10; lv_timer_handler(); }
-    shot(out + "_6_touch_test.ppm");
+    shot(out + "_dark_6_touch_test.ppm");
     ui::game_screen_close_overlays();
     fake_ms += 100;
     lv_timer_handler();

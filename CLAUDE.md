@@ -41,6 +41,12 @@
 - `src/app/save_store.*` saves the game to LittleFS (`/game.bin`, written
   via temp file + rename).
 - Layout is portrait for now; Tom will decide after seeing it on hardware.
+- UI rules from Tom: strong highlight tints with distinct hues (cheap TN
+  panels wash out pale tints at an angle); no shrinking fonts to squeeze
+  labels in; menu is a 3-line hamburger in the top bar; colors come from
+  `src/ui/theme.cpp` palettes (Light/Dark), never hard-coded elsewhere.
+- Settings the player picks (theme, input mode) are saved by
+  `src/app/settings_store.*` (`/ui_settings.bin`).
 
 ## Known hardware issues
 - Tom's boards: 2.8" ESP32-2432S028 in both ILI9341 and ST7789 versions
@@ -58,14 +64,12 @@
   VSPI by itself, so SD works there without conflict.
 - Tom uses a Nintendo DS Lite stylus with firm presses - NOT a finger.
   Don't explain touch problems with finger size or light pressure.
-- 4.0" (and maybe others): the FIRST tap after idle consistently lands about
-  one cell low or one cell right; the next tap is correct, sometimes it takes
-  three. Cause not yet known (as of v0.1.0-alpha.4). Mitigations in place:
-  press starts only after two consecutive readings agree within 8 px, ends
-  after two empty readings; ESP32-32E touch clock 1 MHz. Diagnostic:
-  Menu > Display & touch > Touch test plots raw readings (first one red)
-  and prints how far the first reading was from where the tap settled.
-  `-D CYD_TOUCH_DEBUG` logs raw touches to the serial monitor.
+- 4.0" first-tap offset (first tap after idle landed ~1 cell low or right):
+  FIXED in v0.1.0-alpha.4, confirmed by Tom. The fix: a press starts only
+  after two consecutive readings agree within 8 px, ends after two empty
+  readings; ESP32-32E touch clock 1 MHz. Keep both. Diagnostic still
+  available: Display & touch > Touch test; `-D CYD_TOUCH_DEBUG` logs raw
+  touches to serial.
 - Panel inversion / red-blue order differ between production runs. They are
   fixed per unit on the device (src/hal/panel_prefs.*, saved to LittleFS),
   not with build flags.

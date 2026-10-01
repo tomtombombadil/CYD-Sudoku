@@ -55,9 +55,10 @@ void draw_cb(lv_event_t* e)
     const int ox = a.x1 + 1, oy = a.y1 + 1;   // 1px for the outer thick line
     const int sel = bd->hl.selected;
     const int hd  = bd->hl.digit;
+    const Palette& P = pal();
 
     // Background = thin grid line color; cells are drawn 1px inset over it.
-    fill(layer, a.x1, a.y1, a.x2, a.y2, c_line_thin());
+    fill(layer, a.x1, a.y1, a.x2, a.y2, P.line_thin);
 
     const lv_font_t* vfont = font_for_cell(cell);
     const lv_font_t* nfont = note_font_for_cell(cell);
@@ -71,15 +72,15 @@ void draw_cb(lv_event_t* e)
 
         // Both sides of a clash get the red tint, givens included, so the
         // player can see what the wrong digit collides with.
-        lv_color_t bg = c_cell();
-        if (sel >= 0 && sudoku::same_unit(sel, i)) bg = c_peer();
-        if (hd && v == hd) bg = c_same();
-        if (i == sel) bg = c_selected();
-        if (conflict) bg = c_conflict_bg();
+        lv_color_t bg = P.cell;
+        if (sel >= 0 && sudoku::same_unit(sel, i)) bg = P.peer;
+        if (hd && v == hd) bg = P.same;
+        if (i == sel) bg = P.selected;
+        if (conflict) bg = P.conflict_bg;
         fill(layer, x + 1, y + 1, x + cell - 1, y + cell - 1, bg);
         if (conflict && i == sel) {
             // Keep the red tint visible; show the selection as a frame.
-            const lv_color_t f = c_selected();
+            const lv_color_t f = P.selected;
             fill(layer, x + 1, y + 1, x + cell - 1, y + 2, f);
             fill(layer, x + 1, y + cell - 2, x + cell - 1, y + cell - 1, f);
             fill(layer, x + 1, y + 1, x + 2, y + cell - 1, f);
@@ -88,8 +89,8 @@ void draw_cb(lv_event_t* e)
 
         if (v) {
             buf[0] = '0' + v;
-            const lv_color_t col = conflict && !g.given(i) ? c_conflict()
-                                 : g.given(i) ? c_given() : c_entry();
+            const lv_color_t col = conflict && !g.given(i) ? P.conflict
+                                 : g.given(i) ? P.given : P.entry;
             text(layer, buf, vfont, col, x + 1, y + 1, cell - 1, cell - 1);
         } else if (g.notes(i)) {
             const int sub = (cell - 1) / 3;
@@ -99,7 +100,7 @@ void draw_cb(lv_event_t* e)
                 const int nr = (d - 1) / 3, nc = (d - 1) % 3;
                 // A note matching the highlighted digit is drawn in ink so
                 // candidates for that digit stand out.
-                text(layer, buf, nfont, d == hd ? c_ink() : c_note(),
+                text(layer, buf, nfont, d == hd ? P.note_match : P.note,
                      x + 1 + nc * sub, y + 1 + nr * sub, sub, sub);
             }
         }
@@ -108,8 +109,8 @@ void draw_cb(lv_event_t* e)
     // Thick lines on box borders (2px, covering the thin line + 1px)
     for (int k = 0; k <= 9; k += 3) {
         const int bx = ox + k * cell, by = oy + k * cell;
-        fill(layer, bx - 1, a.y1, bx, a.y2, c_line_thick());
-        fill(layer, a.x1, by - 1, a.x2, by, c_line_thick());
+        fill(layer, bx - 1, a.y1, bx, a.y2, P.line_thick);
+        fill(layer, a.x1, by - 1, a.x2, by, P.line_thick);
     }
 }
 

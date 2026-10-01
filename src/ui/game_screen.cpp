@@ -10,64 +10,79 @@ namespace ui {
 
 namespace {
 
-constexpr int kEraser = 10;          // brush "digit" that erases
-
 game::Game* G = nullptr;
 UiHooks     H{};
+UiSettings  S{};
 
-// Layout (computed once from the screen size)
-int scr_w = 0, scr_h = 0;
-bool large = false;                  // 3.5"/4.0" class screens
+// Layout (computed from the screen size in build_layout)
+int  scr_w = 0, scr_h = 0;
+bool large = false;                  // 320-px-wide screens (3.5"/4.0")
 
 // Widgets
 lv_obj_t* board      = nullptr;
-lv_obj_t* status_l   = nullptr;      // difficulty (large screens only)
-lv_obj_t* status_r   = nullptr;      // clock (large screens only)
-lv_obj_t* digit_btn[10]  = {};
-lv_obj_t* digit_cnt[10]  = {};       // "remaining" counters (large screens only)
+lv_obj_t* clock_l    = nullptr;
+lv_obj_t* diff_l     = nullptr;
+lv_obj_t* digit_btn[10] = {};
+lv_obj_t* digit_cnt[10] = {};        // how many of each digit are left to place
 lv_obj_t* undo_btn   = nullptr;
-lv_obj_t* erase_btn  = nullptr;
 lv_obj_t* notes_btn  = nullptr;
-lv_obj_t* brush_btn  = nullptr;
-lv_obj_t* overlay    = nullptr;      // menu / settings / solved
+lv_obj_t* mode_seg[2] = {};          // [0] Cell first, [1] Digit first
+lv_obj_t* overlay    = nullptr;      // menu / settings / solved / touch test
 
 // Input state
-int  selected    = -1;
-bool notes_mode  = false;
-bool brush_mode  = false;
-int  brush_digit = 0;                // 0 = none, 1..9, kEraser
+int  selected     = -1;
+bool notes_mode   = false;
+int  brush_digit  = 0;               // digit-first mode: the digit being placed
 bool solved_shown = false;
 
 // Timing
 bool     dirty = false;
 uint32_t dirty_ms = 0, last_sec_ms = 0, last_save_ms = 0, now_cache = 0;
 
-lv_style_t st_key, st_key_pressed, st_key_checked, st_key_dim;
-bool styles_ready = false;
+lv_style_t st_key, st_key_pressed, st_key_checked, st_key_dim, st_seg;
+bool styles_inited = false;
+
+bool digit_first() { return S.input == InputMode::DigitFirst; }
 
 // ---------------------------------------------------------------------------
-void init_styles()
+// Styles are set from the current palette; calling again after a theme change
+// updates them in place.
+void apply_styles()
 {
-    if (styles_ready) return;
-    styles_ready = true;
-    lv_style_init(&st_key);
-    lv_style_set_bg_color(&st_key, c_key());
+    const Palette& p = pal();
+    if (!styles_inited) {
+        styles_inited = true;
+        lv_style_init(&st_key);
+        lv_style_init(&st_key_pressed);
+        lv_style_init(&st_key_checked);
+        lv_style_init(&st_key_dim);
+        lv_style_init(&st_seg);
+    }
+    lv_style_set_bg_color(&st_key, p.key);
     lv_style_set_bg_opa(&st_key, LV_OPA_COVER);
-    lv_style_set_border_color(&st_key, c_key_border());
+    lv_style_set_border_color(&st_key, p.key_border);
     lv_style_set_border_width(&st_key, 1);
     lv_style_set_radius(&st_key, 6);
-    lv_style_set_text_color(&st_key, c_ink());
+    lv_style_set_text_color(&st_key, p.ink);
     lv_style_set_pad_all(&st_key, 0);
 
-    lv_style_init(&st_key_pressed);
-    lv_style_set_bg_color(&st_key_pressed, lv_color_hex(0xE6E9ED));
+    lv_style_set_bg_color(&st_key_pressed, p.key_pressed);
+    lv_style_set_bg_opa(&st_key_pressed, LV_OPA_COVER);
 
-    lv_style_init(&st_key_checked);
-    lv_style_set_bg_color(&st_key_checked, c_key_on());
-    lv_style_set_border_color(&st_key_checked, lv_color_hex(0xC99A1F));
+    lv_style_set_bg_color(&st_key_checked, p.key_on);
+    lv_style_set_bg_opa(&st_key_checked, LV_OPA_COVER);
+    lv_style_set_border_color(&st_key_checked, p.key_on);
+    lv_style_set_text_color(&st_key_checked, p.key_on_text);
 
-    lv_style_init(&st_key_dim);
-    lv_style_set_text_color(&st_key_dim, c_key_off_txt());
+    lv_style_set_text_color(&st_key_dim, p.key_dim_text);
+
+    // Segments of the input-mode selector: no border/radius of their own
+    lv_style_set_bg_color(&st_seg, p.key);
+    lv_style_set_bg_opa(&st_seg, LV_OPA_COVER);
+    lv_style_set_text_color(&st_seg, p.ink);
+    lv_style_set_pad_all(&st_seg, 0);
+
+    lv_obj_report_style_change(nullptr);
 }
 
 lv_obj_t* make_key(lv_obj_t* parent, int w, int h, lv_event_cb_t cb, intptr_t user)
@@ -107,6 +122,13 @@ void set_dim(lv_obj_t* o, bool dim)
     else     lv_obj_remove_style(o, &st_key_dim, 0);
 }
 
+int text_width(const char* s, const lv_font_t* f)
+{
+    lv_point_t sz;
+    lv_text_get_size(&sz, s, f, 0, 0, LV_COORD_MAX, LV_TEXT_FLAG_NONE);
+    return sz.x;
+}
+
 void fmt_time(char* out, size_t n, uint32_t s)
 {
     if (s >= 3600) snprintf(out, n, "%lu:%02lu:%02lu", (unsigned long)(s / 3600),
@@ -116,11 +138,16 @@ void fmt_time(char* out, size_t n, uint32_t s)
 
 void update_status()
 {
-    if (!status_l) return;
+    if (!clock_l) return;
     char t[16];
     fmt_time(t, sizeof t, G->elapsed_s());
-    lv_label_set_text(status_l, sudoku::difficulty_name(G->difficulty()));
-    lv_label_set_text(status_r, t);
+    lv_label_set_text(clock_l, t);
+    lv_label_set_text(diff_l, sudoku::difficulty_name(G->difficulty()));
+}
+
+void save_settings()
+{
+    if (H.save_settings) H.save_settings(S);
 }
 
 void show_solved();
@@ -130,22 +157,25 @@ void update()
 {
     BoardHighlight hl;
     hl.selected = selected;
-    if (brush_mode && brush_digit >= 1 && brush_digit <= 9) hl.digit = brush_digit;
+    if (digit_first() && brush_digit) hl.digit = brush_digit;
     else if (selected >= 0) hl.digit = G->value(selected);
     board_set_highlight(board, hl);
 
     for (int d = 1; d <= 9; ++d) {
-        const int placed = G->placed_correct(d);
-        set_checked(digit_btn[d], brush_mode && brush_digit == d);
-        set_dim(digit_btn[d], placed >= 9);
+        const bool finished = G->placed_correct(d) >= 9;
+        set_checked(digit_btn[d], digit_first() && brush_digit == d);
+        set_dim(digit_btn[d], finished);
         if (digit_cnt[d]) {
-            if (placed >= 9) lv_label_set_text(digit_cnt[d], "");
-            else lv_label_set_text_fmt(digit_cnt[d], "%d", 9 - placed);
+            // Left to place = 9 minus how many are on the board now, right or
+            // wrong (what the player can count). Blank once the digit is done.
+            const int left = 9 - G->count(d);
+            if (finished) lv_label_set_text(digit_cnt[d], "");
+            else          lv_label_set_text_fmt(digit_cnt[d], "%d", left > 0 ? left : 0);
         }
     }
     set_checked(notes_btn, notes_mode);
-    set_checked(brush_btn, brush_mode);
-    set_checked(erase_btn, brush_mode && brush_digit == kEraser);
+    set_checked(mode_seg[0], !digit_first());
+    set_checked(mode_seg[1], digit_first());
     set_dim(undo_btn, !G->can_undo());
     update_status();
 
@@ -163,20 +193,21 @@ void changed()
 }
 
 // ---- Input ------------------------------------------------------------------
+// Cell first:  tap a cell, then a digit. The same digit again clears it.
+// Digit first: tap a digit, then cells. Tapping a cell that already holds
+//              that digit clears it; another digit is replaced.
+// Notes mode applies to both: digits toggle pencil marks instead.
 void on_cell(int i)
 {
     if (overlay) return;
     selected = i;
-    if (brush_mode && brush_digit) {
-        const bool ch = (brush_digit == kEraser) ? G->erase(i) : G->enter(i, brush_digit, notes_mode);
-        if (ch) changed();
-    }
+    if (digit_first() && brush_digit && G->enter(i, brush_digit, notes_mode)) changed();
     update();
 }
 
 void on_digit(int d)
 {
-    if (brush_mode) {
+    if (digit_first()) {
         brush_digit = (brush_digit == d) ? 0 : d;
     } else if (selected >= 0 && G->enter(selected, d, notes_mode)) {
         changed();
@@ -184,35 +215,31 @@ void on_digit(int d)
     update();
 }
 
+void set_input_mode(InputMode m)
+{
+    if (S.input == m) return;
+    S.input = m;
+    brush_digit = 0;
+    save_settings();
+}
+
 void digit_cb(lv_event_t* e) { on_digit(static_cast<int>(reinterpret_cast<intptr_t>(lv_event_get_user_data(e)))); }
 
 void tool_cb(lv_event_t* e)
 {
     switch (reinterpret_cast<intptr_t>(lv_event_get_user_data(e))) {
-        case 0:  // Undo
-            if (G->undo()) changed();
-            break;
-        case 1:  // Erase
-            if (brush_mode) brush_digit = (brush_digit == kEraser) ? 0 : kEraser;
-            else if (selected >= 0 && G->erase(selected)) changed();
-            break;
-        case 2:  // Notes
-            notes_mode = !notes_mode;
-            break;
-        case 3:  // Brush
-            brush_mode = !brush_mode;
-            brush_digit = 0;
-            break;
-        case 4:  // Menu
-            game_screen_open_menu();
-            return;
+        case 0: if (G->undo()) changed(); break;
+        case 1: notes_mode = !notes_mode; break;
+        case 2: set_input_mode(InputMode::CellFirst); break;
+        case 3: set_input_mode(InputMode::DigitFirst); break;
+        case 4: game_screen_open_menu(); return;
     }
     update();
 }
 
 // ---- Overlays ---------------------------------------------------------------
-int menu_btn_h() { return large ? 52 : 36; }
-const lv_font_t* menu_font() { return &lv_font_montserrat_20; }
+int menu_btn_h() { return large ? 50 : 32; }
+const lv_font_t* menu_font() { return large ? &lv_font_montserrat_20 : &lv_font_montserrat_14; }
 
 lv_obj_t* overlay_begin(const char* title)
 {
@@ -220,7 +247,7 @@ lv_obj_t* overlay_begin(const char* title)
     overlay = lv_obj_create(lv_layer_top());
     lv_obj_remove_style_all(overlay);
     lv_obj_set_size(overlay, scr_w, scr_h);
-    lv_obj_set_style_bg_color(overlay, c_screen(), 0);
+    lv_obj_set_style_bg_color(overlay, pal().screen, 0);
     lv_obj_set_style_bg_opa(overlay, LV_OPA_COVER, 0);
     lv_obj_set_style_pad_all(overlay, large ? 16 : 10, 0);
     lv_obj_set_style_pad_row(overlay, large ? 10 : 6, 0);
@@ -231,7 +258,7 @@ lv_obj_t* overlay_begin(const char* title)
     lv_obj_t* t = lv_label_create(overlay);
     lv_label_set_text(t, title);
     lv_obj_set_style_text_font(t, large ? &lv_font_montserrat_28 : &lv_font_montserrat_20, 0);
-    lv_obj_set_style_text_color(t, c_ink(), 0);
+    lv_obj_set_style_text_color(t, pal().ink, 0);
     return overlay;
 }
 
@@ -242,7 +269,7 @@ lv_obj_t* overlay_text(const char* s, bool muted)
     lv_obj_set_width(l, lv_pct(100));
     lv_label_set_text(l, s);
     lv_obj_set_style_text_font(l, &lv_font_montserrat_14, 0);
-    lv_obj_set_style_text_color(l, muted ? c_muted() : c_ink(), 0);
+    lv_obj_set_style_text_color(l, muted ? pal().muted : pal().ink, 0);
     return l;
 }
 
@@ -302,6 +329,11 @@ void menu_cb(lv_event_t* e)
             if (H.recalibrate_touch) H.recalibrate_touch();
             break;
         case 7: game_screen_open_touch_test(); break;
+        case 8:
+            game_screen_set_theme(S.theme == Theme::Dark ? Theme::Light : Theme::Dark);
+            save_settings();
+            game_screen_open_settings();
+            break;
     }
 }
 
@@ -318,11 +350,44 @@ void show_solved()
     overlay_button(overlay, "Menu", menu_cb, 3);
 }
 
+// ---- Layout -------------------------------------------------------------------
+// Top to bottom: top bar (clock, difficulty, menu), board, tool row (Undo,
+// Notes, input mode), digit row. Sizes come from the screen resolution: the
+// board gets the largest cell that leaves the controls their minimum height,
+// then any spare height goes back to the controls.
+lv_obj_t* make_hamburger(lv_obj_t* parent, int w, int h)
+{
+    lv_obj_t* b = lv_obj_create(parent);
+    lv_obj_remove_style_all(b);
+    lv_obj_add_style(b, &st_key_pressed, LV_STATE_PRESSED);
+    lv_obj_set_style_radius(b, 6, 0);
+    lv_obj_set_size(b, w, h);
+    lv_obj_set_clickable(b, true);
+    lv_obj_set_scrollable(b, false);
+    lv_obj_add_event_cb(b, tool_cb, LV_EVENT_CLICKED, reinterpret_cast<void*>(4));
+
+    const int bar_w = h * 3 / 4 < 26 ? h * 3 / 4 : 26;
+    const int bar_t = h >= 34 ? 3 : 2;
+    const int step  = h >= 34 ? 7 : 5;
+    for (int k = -1; k <= 1; ++k) {
+        lv_obj_t* bar = lv_obj_create(b);
+        lv_obj_remove_style_all(bar);
+        lv_obj_set_size(bar, bar_w, bar_t);
+        lv_obj_set_style_bg_color(bar, pal().ink, 0);
+        lv_obj_set_style_bg_opa(bar, LV_OPA_COVER, 0);
+        lv_obj_set_style_radius(bar, 1, 0);
+        lv_obj_set_clickable(bar, false);
+        lv_obj_align(bar, LV_ALIGN_CENTER, 0, k * step);
+    }
+    return b;
+}
+
 void build_layout()
 {
+    const Palette& P = pal();
     lv_obj_t* scr = lv_screen_active();
     lv_obj_clean(scr);
-    lv_obj_set_style_bg_color(scr, c_screen(), 0);
+    lv_obj_set_style_bg_color(scr, P.screen, 0);
     lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
     lv_obj_set_scrollable(scr, false);
 
@@ -330,73 +395,116 @@ void build_layout()
     scr_h = lv_display_get_vertical_resolution(nullptr);
     large = scr_w >= 300;
 
-    const int m = 2, gap = 4;
-    int key_h  = scr_h / 8;  if (key_h < 36) key_h = 36;  if (key_h > 64) key_h = 64;
-    int tool_h = scr_h / 9;  if (tool_h < 32) tool_h = 32; if (tool_h > 52) tool_h = 52;
-    const int avail = scr_h - key_h - tool_h - 3 * gap - 2 * m;
-    int side = scr_w - 2 * m;
-    if (avail < side) side = avail;
-    const int cell = (side - 2) / 9;
+    const int m = large ? 2 : 1;          // outer margin
+    const int g = large ? 4 : 2;          // gap between rows
+    int top_h  = large ? 34 : 24;
+    int tool_h = large ? 40 : 28;
+    int key_h  = large ? 54 : 38;
+
+    const int max_cell_w = (scr_w - 2 * m - 2) / 9;
+    const int avail = scr_h - (top_h + tool_h + key_h + 3 * g + 2 * m);
+    int cell = (avail - 2) / 9;
+    if (cell > max_cell_w) cell = max_cell_w;
     const int board_px = 9 * cell + 2;
-    const int spare = avail - board_px;               // room left for a status line
-    const int status_h = spare >= 20 ? spare : 0;
+    int spare = avail - board_px;
+    auto grow = [&spare](int& v, int cap) { const int add = (cap - v) < spare ? (cap - v) : spare; if (add > 0) { v += add; spare -= add; } };
+    grow(key_h, 64);
+    grow(tool_h, 48);
+    grow(top_h, 40);
+    const int extra_gap = spare / 4;      // whatever is left: a little air
 
+    // Top bar
     int y = m;
-    if (status_h) {
-        const lv_font_t* f = large ? &lv_font_montserrat_20 : &lv_font_montserrat_14;
-        status_l = lv_label_create(scr);
-        lv_obj_set_style_text_font(status_l, f, 0);
-        lv_obj_set_style_text_color(status_l, c_muted(), 0);
-        lv_obj_set_pos(status_l, m + 4, y + (status_h - lv_font_get_line_height(f)) / 2);
-        status_r = lv_label_create(scr);
-        lv_obj_set_style_text_font(status_r, f, 0);
-        lv_obj_set_style_text_color(status_r, c_muted(), 0);
-        lv_obj_align(status_r, LV_ALIGN_TOP_RIGHT, -(m + 4), y + (status_h - lv_font_get_line_height(f)) / 2);
-        y += status_h;
-    } else {
-        status_l = status_r = nullptr;
-    }
+    const lv_font_t* bar_font = large ? &lv_font_montserrat_20 : &lv_font_montserrat_14;
+    const int ty = y + (top_h - lv_font_get_line_height(bar_font)) / 2;
+    clock_l = lv_label_create(scr);
+    lv_obj_set_style_text_font(clock_l, bar_font, 0);
+    lv_obj_set_style_text_color(clock_l, P.muted, 0);
+    lv_obj_set_pos(clock_l, m + 6, ty);
+    diff_l = lv_label_create(scr);
+    lv_obj_set_style_text_font(diff_l, bar_font, 0);
+    lv_obj_set_style_text_color(diff_l, P.ink, 0);
+    lv_obj_align(diff_l, LV_ALIGN_TOP_MID, 0, ty);
+    const int hb_w = top_h * 3 / 2;
+    lv_obj_t* hb = make_hamburger(scr, hb_w, top_h);
+    lv_obj_set_pos(hb, scr_w - m - hb_w, y);
+    y += top_h + g + extra_gap;
 
+    // Board
     board = board_create(scr, G, cell, on_cell);
     lv_obj_set_pos(board, (scr_w - board_px) / 2, y);
-    y += board_px + gap;
+    y += board_px + g + extra_gap;
 
-    // Tool row
-    const int tools = 5;
-    const int tool_gap = 4;
-    const int tool_w = (scr_w - 2 * m - (tools - 1) * tool_gap) / tools;
+    // Tool row: Undo | Notes | [Cell first | Digit first]
+    const int row_w = scr_w - 2 * m;
+    const int tg = large ? 6 : 4;
+    const int small_btn = row_w * 22 / 100;
+    const int seg_w = row_w - 2 * small_btn - 2 * tg;
     const lv_font_t* tf = large ? &lv_font_montserrat_20 : &lv_font_montserrat_14;
-    const char* names[tools] = {"Undo", "Erase", "Notes", "Brush", "Menu"};
-    lv_obj_t* tb[tools];
-    const int tools_x = (scr_w - (tools * tool_w + (tools - 1) * tool_gap)) / 2;
-    for (int k = 0; k < tools; ++k) {
-        tb[k] = make_key(scr, tool_w, tool_h, tool_cb, k);
-        lv_obj_set_pos(tb[k], tools_x + k * (tool_w + tool_gap), y);
-        key_label(tb[k], names[k], tf);
-    }
-    undo_btn = tb[0]; erase_btn = tb[1]; notes_btn = tb[2]; brush_btn = tb[3];
-    y += tool_h + gap;
 
-    // Digit bank
+    undo_btn = make_key(scr, small_btn, tool_h, tool_cb, 0);
+    lv_obj_set_pos(undo_btn, m, y);
+    key_label(undo_btn, "Undo", tf);
+    notes_btn = make_key(scr, small_btn, tool_h, tool_cb, 1);
+    lv_obj_set_pos(notes_btn, m + small_btn + tg, y);
+    key_label(notes_btn, "Notes", tf);
+
+    lv_obj_t* seg = lv_obj_create(scr);
+    lv_obj_remove_style_all(seg);
+    lv_obj_set_size(seg, seg_w, tool_h);
+    lv_obj_set_pos(seg, m + 2 * (small_btn + tg), y);
+    lv_obj_set_style_bg_color(seg, P.key_border, 0);     // shows as the divider
+    lv_obj_set_style_bg_opa(seg, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_color(seg, P.key_border, 0);
+    lv_obj_set_style_border_width(seg, 1, 0);
+    lv_obj_set_style_radius(seg, 6, 0);
+    lv_obj_set_style_clip_corner(seg, true, 0);
+    lv_obj_set_style_pad_all(seg, 0, 0);
+    lv_obj_set_style_pad_column(seg, 1, 0);
+    lv_obj_set_flex_flow(seg, LV_FLEX_FLOW_ROW);
+    lv_obj_set_clickable(seg, false);
+    lv_obj_set_scrollable(seg, false);
+    // Full labels if they fit at the row's font size; otherwise the short
+    // ones, never a smaller font (it must stay readable off-angle).
+    const int half = (seg_w - 3) / 2 - 6;
+    const lv_font_t* sf = tf;
+    const char* labels[2] = {"Cell first", "Digit first"};
+    if (text_width(labels[1], sf) > half) { labels[0] = "Cell"; labels[1] = "Digit"; }
+    for (int k = 0; k < 2; ++k) {
+        lv_obj_t* s = lv_obj_create(seg);
+        lv_obj_remove_style_all(s);
+        lv_obj_add_style(s, &st_seg, 0);
+        lv_obj_add_style(s, &st_key_pressed, LV_STATE_PRESSED);
+        lv_obj_add_style(s, &st_key_checked, LV_STATE_CHECKED);
+        lv_obj_set_height(s, lv_pct(100));
+        lv_obj_set_flex_grow(s, 1);
+        lv_obj_set_clickable(s, true);
+        lv_obj_set_scrollable(s, false);
+        lv_obj_add_event_cb(s, tool_cb, LV_EVENT_CLICKED, reinterpret_cast<void*>(2 + k));
+        key_label(s, labels[k], sf);
+        mode_seg[k] = s;
+    }
+    y += tool_h + g + extra_gap;
+
+    // Digit row, each key with a "left to place" count underneath the digit
     const int dgap = large ? 4 : 2;
     const int key_w = (scr_w - 2 * m - 8 * dgap) / 9;
     const int keys_x = (scr_w - (9 * key_w + 8 * dgap)) / 2;
     const lv_font_t* kf = key_h >= 56 ? &lv_font_montserrat_28 : &lv_font_montserrat_20;
+    const lv_font_t* cf = key_h >= 50 ? &lv_font_montserrat_12 : &lv_font_montserrat_10;
+    const int cnt_h = lv_font_get_line_height(cf);
     char s[2] = {0, 0};
     for (int d = 1; d <= 9; ++d) {
         lv_obj_t* k = make_key(scr, key_w, key_h, digit_cb, d);
         lv_obj_set_pos(k, keys_x + (d - 1) * (key_w + dgap), y);
         s[0] = '0' + d;
         lv_obj_t* l = key_label(k, s, kf);
+        lv_obj_align(l, LV_ALIGN_CENTER, 0, -cnt_h / 2);
         digit_btn[d] = k;
-        digit_cnt[d] = nullptr;
-        if (key_h >= 48) {              // room for a "remaining" count
-            lv_obj_align(l, LV_ALIGN_CENTER, 0, -7);
-            digit_cnt[d] = lv_label_create(k);
-            lv_obj_set_style_text_font(digit_cnt[d], &lv_font_montserrat_12, 0);
-            lv_obj_set_style_text_color(digit_cnt[d], c_muted(), 0);
-            lv_obj_align(digit_cnt[d], LV_ALIGN_BOTTOM_MID, 0, -3);
-        }
+        digit_cnt[d] = lv_label_create(k);
+        lv_obj_set_style_text_font(digit_cnt[d], cf, 0);
+        lv_obj_set_style_text_opa(digit_cnt[d], LV_OPA_80, 0);
+        lv_obj_align(digit_cnt[d], LV_ALIGN_BOTTOM_MID, 0, large ? -3 : -1);
     }
 }
 
@@ -434,7 +542,7 @@ void tt_dot(int16_t x, int16_t y, bool first)
     const int py = lv_obj_get_style_pad_top(overlay, LV_PART_MAIN);
     lv_obj_set_size(d, 2 * r + 1, 2 * r + 1);
     lv_obj_set_pos(d, x - r - px, y - r - py);
-    lv_obj_set_style_bg_color(d, first ? c_conflict() : c_entry(), 0);
+    lv_obj_set_style_bg_color(d, first ? pal().conflict : pal().entry, 0);
     if (first) lv_obj_move_foreground(d);
 }
 
@@ -443,14 +551,13 @@ void tt_finish_tap()
     if (tt_n == 0) return;
     // "Settled" position = median of the second half of the readings
     int16_t xs[kMaxSamples], ys[kMaxSamples];
-    const int from = tt_n / 2, m = tt_n - from;
-    for (int k = 0; k < m; ++k) { xs[k] = tt_x[from + k]; ys[k] = tt_y[from + k]; }
-    for (int a = 0; a < m; ++a) for (int b = a + 1; b < m; ++b) {
+    const int from = tt_n / 2, n = tt_n - from;
+    for (int k = 0; k < n; ++k) { xs[k] = tt_x[from + k]; ys[k] = tt_y[from + k]; }
+    for (int a = 0; a < n; ++a) for (int b = a + 1; b < n; ++b) {
         if (xs[b] < xs[a]) { int16_t t = xs[a]; xs[a] = xs[b]; xs[b] = t; }
         if (ys[b] < ys[a]) { int16_t t = ys[a]; ys[a] = ys[b]; ys[b] = t; }
     }
-    const int sx = xs[m / 2], sy = ys[m / 2];
-    // Shift the log and add this tap
+    const int sx = xs[n / 2], sy = ys[n / 2];
     for (int k = 3; k > 0; --k) memcpy(tt_log[k], tt_log[k - 1], sizeof tt_log[0]);
     snprintf(tt_log[0], sizeof tt_log[0], "First off by %+d,%+d (%d reads)",
              tt_x[0] - sx, tt_y[0] - sy, tt_n);
@@ -484,16 +591,27 @@ void tt_close_cb(lv_event_t*)
 } // namespace
 
 // ---- Public -------------------------------------------------------------------
-void game_screen_create(game::Game& g, const UiHooks& hooks)
+void game_screen_create(game::Game& g, const UiHooks& hooks, const UiSettings& settings)
 {
     G = &g;
     H = hooks;
-    init_styles();
+    S = settings;
+    set_theme(S.theme);
+    apply_styles();
     selected = -1;
-    notes_mode = brush_mode = false;
+    notes_mode = false;
     brush_digit = 0;
     solved_shown = g.solved();     // a finished saved game doesn't re-celebrate
     overlay = nullptr;
+    build_layout();
+    update();
+}
+
+void game_screen_set_theme(Theme t)
+{
+    S.theme = t;
+    set_theme(t);
+    apply_styles();
     build_layout();
     update();
 }
@@ -520,10 +638,10 @@ void game_screen_tick(uint32_t now_ms)
     }
 }
 
-void game_screen_tap_cell(int idx)  { on_cell(idx); }
-void game_screen_tap_digit(int d)   { on_digit(d); }
-void game_screen_set_notes(bool on) { notes_mode = on; update(); }
-void game_screen_set_brush(bool on) { brush_mode = on; brush_digit = 0; update(); }
+void game_screen_tap_cell(int idx)            { on_cell(idx); }
+void game_screen_tap_digit(int d)             { on_digit(d); }
+void game_screen_set_notes(bool on)           { notes_mode = on; update(); }
+void game_screen_set_input_mode(InputMode m)  { set_input_mode(m); update(); }
 
 void game_screen_open_menu()
 {
@@ -554,13 +672,16 @@ void game_screen_open_menu()
 void game_screen_open_settings()
 {
     overlay_begin("Display & touch");
-    overlay_button(overlay, "Invert colors", menu_cb, 4);
+    char theme_txt[32];
+    snprintf(theme_txt, sizeof theme_txt, "Theme: %s", theme_name(S.theme));
+    overlay_button(overlay, theme_txt, menu_cb, 8);
+    overlay_button(overlay, "Invert panel colors", menu_cb, 4);
     overlay_button(overlay, "Swap red and blue", menu_cb, 5);
     overlay_button(overlay, "Recalibrate touch", menu_cb, 6);
     if (H.raw_touch) overlay_button(overlay, "Touch test", menu_cb, 7);
     overlay_button(overlay, "Back", menu_cb, 3, true);
     char info[96];
-    snprintf(info, sizeof info, "%s\nFirmware %s", H.board_name ? H.board_name : "",
+    snprintf(info, sizeof info, "%s, firmware %s", H.board_name ? H.board_name : "",
              H.firmware_version ? H.firmware_version : "");
     overlay_text(info, true);
 }
