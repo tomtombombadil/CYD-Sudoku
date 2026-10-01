@@ -9,6 +9,7 @@
 #include <vector>
 #include "game/game.h"
 #include "ui/game_screen.h"
+#include "game/stats.h"
 
 static uint32_t fake_ms = 0;
 static uint32_t tick() { return fake_ms; }
@@ -19,6 +20,10 @@ static int W, H;
 
 static void shot(const std::string& path)
 {
+    lv_mem_monitor_t mon;
+    lv_mem_monitor(&mon);
+    fprintf(stderr, "%s: LVGL heap used %u%%, free %u, biggest free %u\n", path.c_str(),
+            (unsigned)mon.used_pct, (unsigned)mon.free_size, (unsigned)mon.free_biggest_size);
     fake_ms += 50;
     lv_timer_handler();
     lv_obj_invalidate(lv_screen_active());
@@ -36,6 +41,20 @@ static void shot(const std::string& path)
 }
 
 static uint32_t seed() { return 4242; }
+
+static bool fake_stats(stats::Summary& s)
+{
+    s = stats::Summary{};
+    const uint32_t data[][4] = {   // difficulty, result, seconds, hints
+        {0,0,301,0},{0,0,275,0},{1,0,512,0},{1,1,840,1},{1,0,468,2},{2,0,1104,0},
+        {0,0,250,0},{2,1,1500,0},{1,0,455,0},{3,0,1922,3},{1,0,430,0}};
+    for (auto& d : data) {
+        stats::Record r; r.difficulty = d[0]; r.result = d[1] ? stats::Result::GaveUp : stats::Result::Solved;
+        r.seconds = d[2]; r.hints = d[3]; s.add(r);
+    }
+    return true;
+}
+static const char* fake_location() { return "SD card"; }
 
 // Simulated stylus taps for the touch-test screenshot: the first reading of
 // each tap lands one cell low, the rest on target (Tom's 4.0" symptom).
@@ -58,6 +77,7 @@ int main(int argc, char** argv)
     const std::string out = argv[3];
     lv_init();
     lv_tick_set_cb(tick);
+    lv_log_register_print_cb([](lv_log_level_t, const char* m) { fputs(m, stderr); });
     fb.assign(W * H, 0);
     lv_display_t* d = lv_display_create(W, H);
     lv_display_set_color_format(d, LV_COLOR_FORMAT_RGB565);
@@ -92,6 +112,8 @@ int main(int argc, char** argv)
     hooks.random_seed = seed;
     hooks.save = nosave;
     hooks.raw_touch = fake_touch;
+    hooks.load_stats = fake_stats;
+    hooks.stats_location = fake_location;
     hooks.firmware_version = "preview";
     hooks.board_name = "Preview";
     ui::UiSettings settings;
@@ -125,14 +147,29 @@ int main(int argc, char** argv)
         ui::game_screen_set_notes(false);
         ui::game_screen_tap_digit(5);
 
+        // 4. Hint pointing at a cell (first tap)
+        ui::game_screen_hint();
+        shot(pre + "_4_hint.ppm");
+        ui::game_screen_hint();                     // second tap fills it
+
         ui::game_screen_open_menu();
-        shot(pre + "_4_menu.ppm");
+        shot(pre + "_5_menu.ppm");
+        ui::game_screen_open_stats();
+        shot(pre + "_6_stats.ppm");
         ui::game_screen_open_settings();
-        shot(pre + "_5_settings.ppm");
+        shot(pre + "_7_settings.ppm");
         ui::game_screen_close_overlays();
         fake_ms += 50; lv_timer_handler();
     }
 
+    // Solve with hints: mid-flash and after
+    ui::game_screen_set_theme(ui::Theme::Light);
+    for (int k = 0; k < 200 && !g.solved(); ++k) ui::game_screen_hint();
+    shot(out + "_light_8_solved_flash.ppm");
+    for (int k = 0; k < 10; ++k) { fake_ms += 100; lv_timer_handler(); }
+    shot(out + "_light_9_solved.ppm");
+
+    ui::game_screen_set_theme(ui::Theme::Dark);
     ui::game_screen_open_touch_test();
     for (fake_step = 0; fake_step < 3 * 14; ++fake_step) { fake_ms += 10; lv_timer_handler(); }
     fake_step = -1;

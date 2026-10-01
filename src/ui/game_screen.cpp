@@ -21,28 +21,32 @@ bool large = false;                  // 320-px-wide screens (3.5"/4.0")
 // Widgets
 lv_obj_t* board      = nullptr;
 lv_obj_t* clock_l    = nullptr;
-lv_obj_t* diff_l     = nullptr;
+lv_obj_t* center_l   = nullptr;      // difficulty, "Solved!" or a hint prompt
 lv_obj_t* digit_btn[10] = {};
-lv_obj_t* digit_cnt[10] = {};        // how many of each digit are left to place
+lv_obj_t* digit_cnt[10] = {};        // "left to place" (large screens only)
 lv_obj_t* undo_btn   = nullptr;
 lv_obj_t* notes_btn  = nullptr;
-lv_obj_t* mode_seg[2] = {};          // [0] Cell first, [1] Digit first
-lv_obj_t* overlay    = nullptr;      // menu / settings / solved / touch test
+lv_obj_t* mode_btn   = nullptr;
+lv_obj_t* mode_lbl   = nullptr;
+lv_obj_t* hint_btn   = nullptr;
+lv_obj_t* overlay    = nullptr;      // menu / settings / stats / touch test
 
 // Input state
 int  selected     = -1;
 bool notes_mode   = false;
-int  brush_digit  = 0;               // digit-first mode: the digit being placed
-bool solved_shown = false;
+int  brush_digit  = 0;               // Digit 1st mode: the digit being placed
+int  hint_cell    = -1;              // cell the last Hint tap pointed at
+bool solved_seen  = false;           // solve already celebrated + recorded
 
 // Timing
 bool     dirty = false;
 uint32_t dirty_ms = 0, last_sec_ms = 0, last_save_ms = 0, now_cache = 0;
 
-lv_style_t st_key, st_key_pressed, st_key_checked, st_key_dim, st_seg;
+lv_style_t st_key, st_key_pressed, st_key_checked, st_key_dim;
 bool styles_inited = false;
 
 bool digit_first() { return S.input == InputMode::DigitFirst; }
+bool finished()    { return G->solved(); }
 
 // ---------------------------------------------------------------------------
 // Styles are set from the current palette; calling again after a theme change
@@ -56,7 +60,6 @@ void apply_styles()
         lv_style_init(&st_key_pressed);
         lv_style_init(&st_key_checked);
         lv_style_init(&st_key_dim);
-        lv_style_init(&st_seg);
     }
     lv_style_set_bg_color(&st_key, p.key);
     lv_style_set_bg_opa(&st_key, LV_OPA_COVER);
@@ -75,12 +78,6 @@ void apply_styles()
     lv_style_set_text_color(&st_key_checked, p.key_on_text);
 
     lv_style_set_text_color(&st_key_dim, p.key_dim_text);
-
-    // Segments of the input-mode selector: no border/radius of their own
-    lv_style_set_bg_color(&st_seg, p.key);
-    lv_style_set_bg_opa(&st_seg, LV_OPA_COVER);
-    lv_style_set_text_color(&st_seg, p.ink);
-    lv_style_set_pad_all(&st_seg, 0);
 
     lv_obj_report_style_change(nullptr);
 }
@@ -129,20 +126,15 @@ int text_width(const char* s, const lv_font_t* f)
     return sz.x;
 }
 
-void fmt_time(char* out, size_t n, uint32_t s)
-{
-    if (s >= 3600) snprintf(out, n, "%lu:%02lu:%02lu", (unsigned long)(s / 3600),
-                            (unsigned long)(s / 60 % 60), (unsigned long)(s % 60));
-    else           snprintf(out, n, "%lu:%02lu", (unsigned long)(s / 60), (unsigned long)(s % 60));
-}
-
 void update_status()
 {
     if (!clock_l) return;
     char t[16];
-    fmt_time(t, sizeof t, G->elapsed_s());
+    stats::format_time(t, sizeof t, G->elapsed_s());
     lv_label_set_text(clock_l, t);
-    lv_label_set_text(diff_l, sudoku::difficulty_name(G->difficulty()));
+    if (finished())          lv_label_set_text(center_l, "Solved!");
+    else if (hint_cell >= 0) lv_label_set_text(center_l, "Tap Hint to fill");
+    else                     lv_label_set_text(center_l, sudoku::difficulty_name(G->difficulty()));
 }
 
 void save_settings()
@@ -150,39 +142,53 @@ void save_settings()
     if (H.save_settings) H.save_settings(S);
 }
 
-void show_solved();
+void celebrate();
 
 // Push the game state out to every widget.
 void update()
 {
+    const bool done = finished();
     BoardHighlight hl;
-    hl.selected = selected;
-    if (digit_first() && brush_digit) hl.digit = brush_digit;
-    else if (selected >= 0) hl.digit = G->value(selected);
+    hl.selected = done ? -1 : selected;
+    if (!done) {
+        if (digit_first() && brush_digit) hl.digit = brush_digit;
+        else if (selected >= 0) hl.digit = G->value(selected);
+    }
     board_set_highlight(board, hl);
 
     for (int d = 1; d <= 9; ++d) {
-        const bool finished = G->placed_correct(d) >= 9;
-        set_checked(digit_btn[d], digit_first() && brush_digit == d);
-        set_dim(digit_btn[d], finished);
+        const bool digit_done = G->placed_correct(d) >= 9;
+        set_checked(digit_btn[d], !done && digit_first() && brush_digit == d);
+        set_dim(digit_btn[d], digit_done);
         if (digit_cnt[d]) {
             // Left to place = 9 minus how many are on the board now, right or
             // wrong (what the player can count). Blank once the digit is done.
             const int left = 9 - G->count(d);
-            if (finished) lv_label_set_text(digit_cnt[d], "");
-            else          lv_label_set_text_fmt(digit_cnt[d], "%d", left > 0 ? left : 0);
+            if (digit_done) lv_label_set_text(digit_cnt[d], "");
+            else            lv_label_set_text_fmt(digit_cnt[d], "%d", left > 0 ? left : 0);
         }
     }
-    set_checked(notes_btn, notes_mode);
-    set_checked(mode_seg[0], !digit_first());
-    set_checked(mode_seg[1], digit_first());
-    set_dim(undo_btn, !G->can_undo());
+    set_checked(notes_btn, notes_mode && !done);
+    lv_label_set_text(mode_lbl, digit_first() ? "Digit 1st" : "Cell 1st");
+    set_dim(undo_btn, done || !G->can_undo());
+    set_dim(notes_btn, done);
+    set_dim(mode_btn, done);
+    set_dim(hint_btn, done);
+    set_checked(hint_btn, hint_cell >= 0 && !done);
     update_status();
 
-    if (G->solved() && !solved_shown) {
-        solved_shown = true;
+    if (done && !solved_seen) {
+        solved_seen = true;
         if (H.save) H.save(*G);
-        show_solved();
+        if (H.record_stat) {
+            stats::Record r;
+            r.difficulty = static_cast<uint8_t>(G->difficulty());
+            r.result = stats::Result::Solved;
+            r.seconds = G->elapsed_s();
+            r.hints = static_cast<uint8_t>(G->hints_used());
+            H.record_stat(r);
+        }
+        celebrate();
     }
 }
 
@@ -192,33 +198,88 @@ void changed()
     dirty_ms = now_cache;
 }
 
+// ---- Celebration --------------------------------------------------------------
+// Two quick amber flashes over the finished board, then the solved board stays
+// on screen. Nothing else opens; the menu is there when the player wants it.
+lv_obj_t*   flash_obj = nullptr;
+lv_timer_t* flash_timer = nullptr;
+int         flash_step = 0;
+
+void flash_cb(lv_timer_t*)
+{
+    ++flash_step;
+    if (flash_step >= 4) {
+        lv_timer_delete(flash_timer);
+        flash_timer = nullptr;
+        lv_obj_delete(flash_obj);
+        flash_obj = nullptr;
+        return;
+    }
+    lv_obj_set_style_bg_opa(flash_obj, (flash_step % 2) ? LV_OPA_TRANSP : LV_OPA_60, 0);
+}
+
+void celebrate()
+{
+    if (flash_obj) return;
+    flash_obj = lv_obj_create(lv_layer_top());
+    lv_obj_remove_style_all(flash_obj);
+    lv_obj_set_size(flash_obj, scr_w, scr_h);
+    lv_obj_set_style_bg_color(flash_obj, pal().key_on, 0);
+    lv_obj_set_style_bg_opa(flash_obj, LV_OPA_60, 0);
+    lv_obj_set_clickable(flash_obj, false);
+    flash_step = 0;
+    flash_timer = lv_timer_create(flash_cb, 180, nullptr);
+}
+
 // ---- Input ------------------------------------------------------------------
-// Cell first:  tap a cell, then a digit. The same digit again clears it.
-// Digit first: tap a digit, then cells. Tapping a cell that already holds
-//              that digit clears it; another digit is replaced.
+// Cell 1st:  tap a cell, then a digit. The same digit again clears it.
+// Digit 1st: tap a digit, then cells. Tapping a cell that already holds
+//            that digit clears it; another digit is replaced. Picking a
+//            digit clears the cell highlight.
 // Notes mode applies to both: digits toggle pencil marks instead.
 void on_cell(int i)
 {
-    if (overlay) return;
+    if (overlay || finished()) return;
     selected = i;
+    hint_cell = -1;
     if (digit_first() && brush_digit && G->enter(i, brush_digit, notes_mode)) changed();
     update();
 }
 
 void on_digit(int d)
 {
+    if (finished()) return;
+    hint_cell = -1;
     if (digit_first()) {
         brush_digit = (brush_digit == d) ? 0 : d;
+        selected = -1;
     } else if (selected >= 0 && G->enter(selected, d, notes_mode)) {
         changed();
     }
     update();
 }
 
-void set_input_mode(InputMode m)
+// First tap: point at the cell (selected + highlighted, top bar prompts).
+// Second tap on the same cell: fill it with the correct digit.
+void on_hint()
 {
-    if (S.input == m) return;
-    S.input = m;
+    if (finished()) return;
+    if (hint_cell >= 0 && hint_cell == selected && G->hint_target(selected) == hint_cell) {
+        if (G->apply_hint(hint_cell)) changed();
+        hint_cell = -1;
+    } else {
+        const int t = G->hint_target(selected);
+        if (t < 0) return;
+        selected = t;
+        hint_cell = t;
+        brush_digit = 0;
+    }
+    update();
+}
+
+void toggle_input_mode()
+{
+    S.input = digit_first() ? InputMode::CellFirst : InputMode::DigitFirst;
     brush_digit = 0;
     save_settings();
 }
@@ -227,12 +288,15 @@ void digit_cb(lv_event_t* e) { on_digit(static_cast<int>(reinterpret_cast<intptr
 
 void tool_cb(lv_event_t* e)
 {
-    switch (reinterpret_cast<intptr_t>(lv_event_get_user_data(e))) {
+    const intptr_t id = reinterpret_cast<intptr_t>(lv_event_get_user_data(e));
+    if (id == 4) { game_screen_open_menu(); return; }
+    if (finished()) return;
+    if (id != 3) hint_cell = -1;
+    switch (id) {
         case 0: if (G->undo()) changed(); break;
         case 1: notes_mode = !notes_mode; break;
-        case 2: set_input_mode(InputMode::CellFirst); break;
-        case 3: set_input_mode(InputMode::DigitFirst); break;
-        case 4: game_screen_open_menu(); return;
+        case 2: toggle_input_mode(); break;
+        case 3: on_hint(); return;
     }
     update();
 }
@@ -282,8 +346,29 @@ lv_obj_t* overlay_button(lv_obj_t* parent, const char* text, lv_event_cb_t cb, i
     return b;
 }
 
+// A button pinned to the bottom of the overlay (outside the column flow)
+lv_obj_t* overlay_bottom_button(const char* text, lv_event_cb_t cb, intptr_t user)
+{
+    lv_obj_t* b = make_key(overlay, lv_pct(100), menu_btn_h(), cb, user);
+    lv_obj_add_state(b, LV_STATE_CHECKED);
+    key_label(b, text, menu_font());
+    lv_obj_set_ignore_layout(b, true);
+    lv_obj_align(b, LV_ALIGN_BOTTOM_MID, 0, 0);
+    return b;
+}
+
 void start_new(sudoku::Difficulty d)
 {
+    // Leaving an unfinished puzzle that was actually played counts as giving up
+    if (H.record_stat && G->active() && !G->solved() && (G->can_undo() || G->elapsed_s() >= 30)) {
+        stats::Record r;
+        r.difficulty = static_cast<uint8_t>(G->difficulty());
+        r.result = stats::Result::GaveUp;
+        r.seconds = G->elapsed_s();
+        r.hints = static_cast<uint8_t>(G->hints_used());
+        H.record_stat(r);
+    }
+
     // Expert can take a moment on the ESP32; say so before the work starts.
     overlay_begin("New game");
     char msg[48];
@@ -295,7 +380,8 @@ void start_new(sudoku::Difficulty d)
     G->start(d, rng);
     selected = -1;
     brush_digit = 0;
-    solved_shown = false;
+    hint_cell = -1;
+    solved_seen = false;
     game_screen_close_overlays();
     if (H.save) H.save(*G);
     last_save_ms = now_cache;
@@ -314,14 +400,15 @@ void menu_cb(lv_event_t* e)
         case 0:  // restart puzzle
             G->restart();
             selected = -1;
-            solved_shown = false;
+            hint_cell = -1;
+            solved_seen = false;
             game_screen_close_overlays();
             changed();
             update();
             break;
         case 1: game_screen_open_settings(); break;
         case 2: game_screen_close_overlays(); update(); break;
-        case 3: game_screen_open_menu(); break;                // back from settings
+        case 3: game_screen_open_menu(); break;                // back to the menu
         case 4: if (H.toggle_invert) H.toggle_invert(); break;
         case 5: if (H.toggle_swap_rb) H.toggle_swap_rb(); break;
         case 6:
@@ -334,27 +421,70 @@ void menu_cb(lv_event_t* e)
             save_settings();
             game_screen_open_settings();
             break;
+        case 9: game_screen_open_stats(); break;
     }
 }
 
-void show_solved()
+// ---- Stats screen -------------------------------------------------------------
+// Each table is 4 column labels holding all rows ("\n"-separated) plus a
+// header row: 8 objects per table however many rows it has, which keeps LVGL's
+// small memory pool safe.
+struct StatsTable {
+    char   col[4][256];
+    size_t len[4];
+    int    rows;
+};
+
+void stats_table_add(StatsTable& t, const char* a, const char* b, const char* c, const char* d)
 {
-    overlay_begin("Solved!");
-    char t[16], msg[64];
-    fmt_time(t, sizeof t, G->elapsed_s());
-    snprintf(msg, sizeof msg, "%s puzzle in %s.", sudoku::difficulty_name(G->difficulty()), t);
-    overlay_text(msg, false);
-    char again[32];
-    snprintf(again, sizeof again, "New %s game", sudoku::difficulty_name(G->difficulty()));
-    overlay_button(overlay, again, new_game_cb, static_cast<intptr_t>(G->difficulty()), true);
-    overlay_button(overlay, "Menu", menu_cb, 3);
+    // Every column gets a line per row, even when the cell is empty, so the
+    // columns stay lined up.
+    const char* cells[4] = {a, b, c, d};
+    for (int k = 0; k < 4; ++k) {
+        const size_t room = sizeof t.col[k] - t.len[k];
+        const int n = snprintf(t.col[k] + t.len[k], room, "%s%s", t.rows ? "\n" : "", cells[k]);
+        if (n > 0 && size_t(n) < room) t.len[k] += n;
+    }
+    ++t.rows;
 }
+
+void stats_table_show(const StatsTable& t, const char* const head[4],
+                      const lv_font_t* head_font, const lv_font_t* body_font)
+{
+    static const int8_t pct_large[4] = {34, 22, 24, 20};
+    static const int8_t pct_small[4] = {30, 29, 24, 17};
+    const int8_t* pct = large ? pct_large : pct_small;
+    for (int part = 0; part < 2; ++part) {
+        lv_obj_t* row = lv_obj_create(overlay);
+        lv_obj_remove_style_all(row);
+        lv_obj_set_size(row, lv_pct(100), LV_SIZE_CONTENT);
+        lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
+        lv_obj_set_clickable(row, false);
+        lv_obj_set_scrollable(row, false);
+        if (part == 1) lv_obj_set_style_margin_top(row, large ? -6 : -4, 0);  // header hugs its rows
+        for (int k = 0; k < 4; ++k) {
+            lv_obj_t* l = lv_label_create(row);
+            lv_label_set_text(l, part == 0 ? head[k] : t.col[k]);
+            lv_label_set_long_mode(l, LV_LABEL_LONG_MODE_CLIP);
+            lv_obj_set_width(l, lv_pct(pct[k]));
+            lv_obj_set_style_text_font(l, part == 0 ? head_font : body_font, 0);
+            lv_obj_set_style_text_color(l, part == 0 ? pal().muted : pal().ink, 0);
+            lv_obj_set_style_text_line_space(l, large ? 3 : 1, 0);
+        }
+    }
+}
+
+void stats_back_cb(lv_event_t*) { game_screen_open_menu(); }
+
+} // namespace
 
 // ---- Layout -------------------------------------------------------------------
 // Top to bottom: top bar (clock, difficulty, menu), board, tool row (Undo,
-// Notes, input mode), digit row. Sizes come from the screen resolution: the
-// board gets the largest cell that leaves the controls their minimum height,
-// then any spare height goes back to the controls.
+// Notes, input mode, Hint), digit row. Sizes come from the screen resolution:
+// the board gets the largest cell that leaves the controls their minimum
+// height, then any spare height goes back to the controls.
+namespace {
+
 lv_obj_t* make_hamburger(lv_obj_t* parent, int w, int h)
 {
     lv_obj_t* b = lv_obj_create(parent);
@@ -391,15 +521,17 @@ void build_layout()
     lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
     lv_obj_set_scrollable(scr, false);
 
-    scr_w = lv_display_get_horizontal_resolution(nullptr);
-    scr_h = lv_display_get_vertical_resolution(nullptr);
+    scr_w = lv_display_get_horizontal_resolution(lv_display_get_default());
+    scr_h = lv_display_get_vertical_resolution(lv_display_get_default());
     large = scr_w >= 300;
 
+    // Small screens drop the digit counters so the board can be bigger
+    const bool counters = large;
     const int m = large ? 2 : 1;          // outer margin
     const int g = large ? 4 : 2;          // gap between rows
-    int top_h  = large ? 34 : 24;
+    int top_h  = large ? 34 : 23;
     int tool_h = large ? 40 : 28;
-    int key_h  = large ? 54 : 38;
+    int key_h  = large ? 54 : 34;
 
     const int max_cell_w = (scr_w - 2 * m - 2) / 9;
     const int avail = scr_h - (top_h + tool_h + key_h + 3 * g + 2 * m);
@@ -421,10 +553,10 @@ void build_layout()
     lv_obj_set_style_text_font(clock_l, bar_font, 0);
     lv_obj_set_style_text_color(clock_l, P.muted, 0);
     lv_obj_set_pos(clock_l, m + 6, ty);
-    diff_l = lv_label_create(scr);
-    lv_obj_set_style_text_font(diff_l, bar_font, 0);
-    lv_obj_set_style_text_color(diff_l, P.ink, 0);
-    lv_obj_align(diff_l, LV_ALIGN_TOP_MID, 0, ty);
+    center_l = lv_label_create(scr);
+    lv_obj_set_style_text_font(center_l, bar_font, 0);
+    lv_obj_set_style_text_color(center_l, P.ink, 0);
+    lv_obj_align(center_l, LV_ALIGN_TOP_MID, 0, ty);
     const int hb_w = top_h * 3 / 2;
     lv_obj_t* hb = make_hamburger(scr, hb_w, top_h);
     lv_obj_set_pos(hb, scr_w - m - hb_w, y);
@@ -435,64 +567,40 @@ void build_layout()
     lv_obj_set_pos(board, (scr_w - board_px) / 2, y);
     y += board_px + g + extra_gap;
 
-    // Tool row: Undo | Notes | [Cell first | Digit first]
+    // Tool row: Undo | Notes | Cell 1st/Digit 1st | Hint, widths from the
+    // labels. Uses the large font only if all four fit with some padding.
     const int row_w = scr_w - 2 * m;
-    const int tg = large ? 6 : 4;
-    const int small_btn = row_w * 22 / 100;
-    const int seg_w = row_w - 2 * small_btn - 2 * tg;
+    const int tg = large ? 5 : 3;
+    const char* names[4] = {"Undo", "Notes", "Digit 1st", "Hint"};   // [2] = widest mode label
     const lv_font_t* tf = large ? &lv_font_montserrat_20 : &lv_font_montserrat_14;
-
-    undo_btn = make_key(scr, small_btn, tool_h, tool_cb, 0);
-    lv_obj_set_pos(undo_btn, m, y);
-    key_label(undo_btn, "Undo", tf);
-    notes_btn = make_key(scr, small_btn, tool_h, tool_cb, 1);
-    lv_obj_set_pos(notes_btn, m + small_btn + tg, y);
-    key_label(notes_btn, "Notes", tf);
-
-    lv_obj_t* seg = lv_obj_create(scr);
-    lv_obj_remove_style_all(seg);
-    lv_obj_set_size(seg, seg_w, tool_h);
-    lv_obj_set_pos(seg, m + 2 * (small_btn + tg), y);
-    lv_obj_set_style_bg_color(seg, P.key_border, 0);     // shows as the divider
-    lv_obj_set_style_bg_opa(seg, LV_OPA_COVER, 0);
-    lv_obj_set_style_border_color(seg, P.key_border, 0);
-    lv_obj_set_style_border_width(seg, 1, 0);
-    lv_obj_set_style_radius(seg, 6, 0);
-    lv_obj_set_style_clip_corner(seg, true, 0);
-    lv_obj_set_style_pad_all(seg, 0, 0);
-    lv_obj_set_style_pad_column(seg, 1, 0);
-    lv_obj_set_flex_flow(seg, LV_FLEX_FLOW_ROW);
-    lv_obj_set_clickable(seg, false);
-    lv_obj_set_scrollable(seg, false);
-    // Full labels if they fit at the row's font size; otherwise the short
-    // ones, never a smaller font (it must stay readable off-angle).
-    const int half = (seg_w - 3) / 2 - 6;
-    const lv_font_t* sf = tf;
-    const char* labels[2] = {"Cell first", "Digit first"};
-    if (text_width(labels[1], sf) > half) { labels[0] = "Cell"; labels[1] = "Digit"; }
-    for (int k = 0; k < 2; ++k) {
-        lv_obj_t* s = lv_obj_create(seg);
-        lv_obj_remove_style_all(s);
-        lv_obj_add_style(s, &st_seg, 0);
-        lv_obj_add_style(s, &st_key_pressed, LV_STATE_PRESSED);
-        lv_obj_add_style(s, &st_key_checked, LV_STATE_CHECKED);
-        lv_obj_set_height(s, lv_pct(100));
-        lv_obj_set_flex_grow(s, 1);
-        lv_obj_set_clickable(s, true);
-        lv_obj_set_scrollable(s, false);
-        lv_obj_add_event_cb(s, tool_cb, LV_EVENT_CLICKED, reinterpret_cast<void*>(2 + k));
-        key_label(s, labels[k], sf);
-        mode_seg[k] = s;
+    int nat[4], total = 0;
+    for (int k = 0; k < 4; ++k) { nat[k] = text_width(names[k], tf); total += nat[k]; }
+    if (total + 4 * 12 + 3 * tg > row_w && tf != &lv_font_montserrat_14) {
+        tf = &lv_font_montserrat_14;
+        total = 0;
+        for (int k = 0; k < 4; ++k) { nat[k] = text_width(names[k], tf); total += nat[k]; }
     }
+    const int pad_each = (row_w - total - 3 * tg) / 4;   // spread spare width evenly
+    lv_obj_t* tb[4];
+    int x = m;
+    for (int k = 0; k < 4; ++k) {
+        const int w = (k == 3) ? (m + row_w - x) : nat[k] + pad_each;
+        tb[k] = make_key(scr, w, tool_h, tool_cb, k);
+        lv_obj_set_pos(tb[k], x, y);
+        lv_obj_t* l = key_label(tb[k], names[k], tf);
+        if (k == 2) mode_lbl = l;
+        x += w + tg;
+    }
+    undo_btn = tb[0]; notes_btn = tb[1]; mode_btn = tb[2]; hint_btn = tb[3];
     y += tool_h + g + extra_gap;
 
-    // Digit row, each key with a "left to place" count underneath the digit
+    // Digit row (with "left to place" counts on large screens)
     const int dgap = large ? 4 : 2;
     const int key_w = (scr_w - 2 * m - 8 * dgap) / 9;
     const int keys_x = (scr_w - (9 * key_w + 8 * dgap)) / 2;
     const lv_font_t* kf = key_h >= 56 ? &lv_font_montserrat_28 : &lv_font_montserrat_20;
-    const lv_font_t* cf = key_h >= 50 ? &lv_font_montserrat_12 : &lv_font_montserrat_10;
-    const int cnt_h = lv_font_get_line_height(cf);
+    const lv_font_t* cf = &lv_font_montserrat_12;
+    const int cnt_h = counters ? lv_font_get_line_height(cf) : 0;
     char s[2] = {0, 0};
     for (int d = 1; d <= 9; ++d) {
         lv_obj_t* k = make_key(scr, key_w, key_h, digit_cb, d);
@@ -501,10 +609,13 @@ void build_layout()
         lv_obj_t* l = key_label(k, s, kf);
         lv_obj_align(l, LV_ALIGN_CENTER, 0, -cnt_h / 2);
         digit_btn[d] = k;
-        digit_cnt[d] = lv_label_create(k);
-        lv_obj_set_style_text_font(digit_cnt[d], cf, 0);
-        lv_obj_set_style_text_opa(digit_cnt[d], LV_OPA_80, 0);
-        lv_obj_align(digit_cnt[d], LV_ALIGN_BOTTOM_MID, 0, large ? -3 : -1);
+        digit_cnt[d] = nullptr;
+        if (counters) {
+            digit_cnt[d] = lv_label_create(k);
+            lv_obj_set_style_text_font(digit_cnt[d], cf, 0);
+            lv_obj_set_style_text_opa(digit_cnt[d], LV_OPA_80, 0);
+            lv_obj_align(digit_cnt[d], LV_ALIGN_BOTTOM_MID, 0, -3);
+        }
     }
 }
 
@@ -601,7 +712,8 @@ void game_screen_create(game::Game& g, const UiHooks& hooks, const UiSettings& s
     selected = -1;
     notes_mode = false;
     brush_digit = 0;
-    solved_shown = g.solved();     // a finished saved game doesn't re-celebrate
+    hint_cell = -1;
+    solved_seen = g.solved();      // a finished saved game isn't celebrated again
     overlay = nullptr;
     build_layout();
     update();
@@ -641,15 +753,16 @@ void game_screen_tick(uint32_t now_ms)
 void game_screen_tap_cell(int idx)            { on_cell(idx); }
 void game_screen_tap_digit(int d)             { on_digit(d); }
 void game_screen_set_notes(bool on)           { notes_mode = on; update(); }
-void game_screen_set_input_mode(InputMode m)  { set_input_mode(m); update(); }
+void game_screen_hint()                       { on_hint(); }
+void game_screen_set_input_mode(InputMode m)
+{
+    if (S.input != m) toggle_input_mode();
+    update();
+}
 
 void game_screen_open_menu()
 {
     overlay_begin("CYD Sudoku");
-    char t[16], line[48];
-    fmt_time(t, sizeof t, G->elapsed_s());
-    snprintf(line, sizeof line, "Current game: %s, %s", sudoku::difficulty_name(G->difficulty()), t);
-    overlay_text(line, true);
     overlay_text("Start a new game:", false);
 
     lv_obj_t* grid = lv_obj_create(overlay);
@@ -665,6 +778,7 @@ void game_screen_open_menu()
         key_label(b, sudoku::difficulty_name(static_cast<sudoku::Difficulty>(d)), menu_font());
     }
     overlay_button(overlay, "Restart this puzzle", menu_cb, 0);
+    if (H.load_stats) overlay_button(overlay, "Stats", menu_cb, 9);
     overlay_button(overlay, "Display & touch", menu_cb, 1);
     overlay_button(overlay, "Back to game", menu_cb, 2, true);
 }
@@ -686,17 +800,61 @@ void game_screen_open_settings()
     overlay_text(info, true);
 }
 
+void game_screen_open_stats()
+{
+    overlay_begin("Stats");
+    static stats::Summary sum;               // ~200 bytes; static keeps it off the stack
+    const bool ok = H.load_stats && H.load_stats(sum);
+    const lv_font_t* tf = large ? &lv_font_montserrat_20 : &lv_font_montserrat_14;
+    const lv_font_t* rf = &lv_font_montserrat_14;
+
+    if (!ok || sum.total == 0) {
+        overlay_text("No games recorded yet. Solved puzzles, and puzzles you leave "
+                     "for a new game, are listed here.", false);
+    } else {
+        static StatsTable levels, recent;           // ~2 KB each: keep off the stack
+        levels = StatsTable{};
+        recent = StatsTable{};
+        for (int d = 0; d < 4; ++d) {
+            const stats::PerDifficulty& p = sum.level[d];
+            char n[12], avg[16] = "-", best[16] = "-";
+            snprintf(n, sizeof n, "%lu", (unsigned long)p.solved);
+            if (p.solved) {
+                stats::format_time(avg, sizeof avg, sum.average_s(d));
+                stats::format_time(best, sizeof best, p.best_s);
+            }
+            stats_table_add(levels, sudoku::difficulty_name(static_cast<sudoku::Difficulty>(d)), n, avg, best);
+        }
+        const char* const head1[4] = {"Level", "Solved", large ? "Average" : "Avg", "Best"};
+        stats_table_show(levels, head1, rf, tf);
+
+        const int max_rows = large ? 7 : 5;
+        const int show = sum.recent_n < max_rows ? sum.recent_n : max_rows;
+        for (int i = 0; i < show; ++i) {
+            const stats::Record& r = sum.newest(i);
+            char t[16], h[8] = "";
+            stats::format_time(t, sizeof t, r.seconds);
+            if (r.hints) snprintf(h, sizeof h, "%u", (unsigned)r.hints);
+            stats_table_add(recent, sudoku::difficulty_name(static_cast<sudoku::Difficulty>(r.difficulty & 3)),
+                            stats::result_name(r.result), t, h);
+        }
+        const char* const head2[4] = {"Recent", "", "Time", "Hints"};
+        stats_table_show(recent, head2, rf, rf);
+    }
+    char where[64];
+    snprintf(where, sizeof where, "Saved on the %s.",
+             H.stats_location ? H.stats_location() : "board");
+    overlay_text(where, true);
+    overlay_bottom_button("Back", stats_back_cb, 0);
+}
+
 void game_screen_open_touch_test()
 {
     overlay_begin("Touch test");
     tt_info = overlay_text("Tap anywhere. Red dot = first reading of a tap, blue = the rest.", true);
     tt_n = tt_misses = tt_log_n = tt_dot_next = 0;
     for (auto& d : tt_dots) d = nullptr;
-    lv_obj_t* done = make_key(overlay, lv_pct(100), menu_btn_h(), tt_close_cb, 0);
-    lv_obj_add_state(done, LV_STATE_CHECKED);
-    key_label(done, "Done", menu_font());
-    lv_obj_set_ignore_layout(done, true);
-    lv_obj_align(done, LV_ALIGN_BOTTOM_MID, 0, 0);
+    overlay_bottom_button("Done", tt_close_cb, 0);
     tt_timer = lv_timer_create(tt_timer_cb, 10, nullptr);
 }
 

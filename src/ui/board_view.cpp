@@ -89,8 +89,9 @@ void draw_cb(lv_event_t* e)
 
         if (v) {
             buf[0] = '0' + v;
-            const lv_color_t col = conflict && !g.given(i) ? P.conflict
-                                 : g.given(i) ? P.given : P.entry;
+            const lv_color_t col = conflict && !g.locked(i) ? P.conflict
+                                 : g.given(i)  ? P.given
+                                 : g.hinted(i) ? P.hinted : P.entry;
             text(layer, buf, vfont, col, x + 1, y + 1, cell - 1, cell - 1);
         } else if (g.notes(i)) {
             const int sub = (cell - 1) / 3;

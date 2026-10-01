@@ -81,6 +81,16 @@ int main()
     CHECK(h.deserialize(buf.data(), n));
     for (int i = 0; i < N; ++i) CHECK(h.value(i) == g.value(i) && h.notes(i) == g.notes(i) && h.given(i) == g.given(i));
     CHECK(h.can_undo());
+    // Old 'SUD1' saves (no hint fields) still load
+    {
+        std::vector<uint8_t> v1(buf.begin(), buf.begin() + n);
+        v1.erase(v1.begin() + 14, v1.begin() + 26);   // drop hints_used + 11 bit bytes
+        v1[0] = 'S'; v1[1] = 'U'; v1[2] = 'D'; v1[3] = '1';
+        static Game o;
+        CHECK(o.deserialize(v1.data(), v1.size()));
+        for (int i = 0; i < N; ++i) CHECK(o.value(i) == g.value(i) && o.notes(i) == g.notes(i) && !o.hinted(i));
+        CHECK(o.hints_used() == 0 && o.can_undo());
+    }
     buf[0] ^= 0xFF;
     CHECK(!h.deserialize(buf.data(), n));            // corrupt file rejected
 
@@ -91,6 +101,62 @@ int main()
     for (int i = 0; i < N; ++i) if (!g.given(i)) g.enter(i, sol.c[i], false);
     CHECK(g.solved());
     for (int d = 1; d <= 9; ++d) CHECK(g.placed_correct(d) == 9);
+
+    // ---- Hints ----
+    {
+        static Game hg;
+        sudoku::Rng r2(99);
+        hg.start(Difficulty::Medium, r2);
+        sudoku::Grid pz{}, sl{};
+        for (int i = 0; i < N; ++i) pz.c[i] = hg.given(i) ? hg.value(i) : 0;
+        CHECK(sudoku::count_solutions(pz, 2, &sl) == 1);
+
+        // No mistakes: target is an empty cell, and on a fresh puzzle the
+        // easiest one is a naked single
+        int t = hg.hint_target(-1);
+        CHECK(t >= 0 && hg.value(t) == 0);
+
+        // A selected empty cell is preferred
+        int other = -1;
+        for (int i = 0; i < N; ++i) if (!hg.given(i) && i != t) { other = i; break; }
+        CHECK(hg.hint_target(other) == other);
+
+        // A wrong entry elsewhere takes priority over an empty cell
+        const int wrong_d = sl.c[other] % 9 + 1;
+        hg.enter(other, wrong_d, false);
+        CHECK(hg.hint_target(-1) == other);
+        CHECK(hg.hint_target(t) == t);                    // ...unless another cell is selected
+
+        // Applying fixes it, locks it, counts it, and clears peer notes
+        int peer = -1;
+        for (int j = 0; j < N; ++j) if (!hg.given(j) && j != other && !hg.value(j) && sudoku::same_unit(other, j)) { peer = j; break; }
+        CHECK(peer >= 0);
+        hg.enter(peer, sl.c[other], true);
+        CHECK(hg.apply_hint(other));
+        CHECK(hg.value(other) == sl.c[other] && hg.hinted(other) && hg.locked(other));
+        CHECK(hg.hints_used() == 1);
+        CHECK(!hg.has_note(peer, sl.c[other]));
+        CHECK(!hg.enter(other, 1, false) && !hg.erase(other));   // locked
+        CHECK(!hg.apply_hint(other));                            // already right
+
+        // Survives save/load
+        std::vector<uint8_t> b2(Game::max_serialized_size());
+        size_t n2 = hg.serialize(b2.data(), b2.size());
+        static Game hl;
+        CHECK(hl.deserialize(b2.data(), n2));
+        CHECK(hl.hinted(other) && hl.hints_used() == 1 && hl.value(other) == sl.c[other]);
+
+        // Undo removes the hint (count stays) and restores the wrong entry + note
+        CHECK(hg.undo());
+        CHECK(!hg.hinted(other) && hg.value(other) == wrong_d && hg.has_note(peer, sl.c[other]));
+        CHECK(hg.hints_used() == 1);
+
+        // Hinting until solved
+        int guard = 0;
+        for (int tgt; (tgt = hg.hint_target(-1)) >= 0 && guard < 100; ++guard) CHECK(hg.apply_hint(tgt));
+        CHECK(hg.solved());
+        CHECK(hg.hint_target(-1) == -1);
+    }
 
     // Undo history overflow is handled
     g.restart();

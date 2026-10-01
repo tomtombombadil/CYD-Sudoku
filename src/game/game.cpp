@@ -15,8 +15,9 @@ void Game::start(Difficulty d, sudoku::Rng& rng)
 
 void Game::restart()
 {
-    for (int i = 0; i < N; ++i) { value_[i] = puzzle_.c[i]; notes_[i] = 0; }
+    for (int i = 0; i < N; ++i) { value_[i] = puzzle_.c[i]; notes_[i] = 0; hinted_[i] = 0; }
     elapsed_s_ = 0;
+    hints_used_ = 0;
     undo_n_ = 0;
     group_ = 0;
     active_ = true;
@@ -64,9 +65,21 @@ void Game::record(int i)
     undo_[undo_n_++] = Change{static_cast<uint8_t>(i), value_[i], notes_[i], group_};
 }
 
+void Game::clear_peer_notes(int i, int d)
+{
+    // d can no longer be a candidate anywhere cell i sees.
+    const uint16_t bit = 1u << d;
+    for (int j = 0; j < N; ++j) {
+        if (j != i && (notes_[j] & bit) && same_unit(i, j)) {
+            record(j);
+            notes_[j] &= ~bit;
+        }
+    }
+}
+
 bool Game::enter(int i, int d, bool notes_mode)
 {
-    if (!active_ || i < 0 || i >= N || d < 1 || d > 9 || given(i)) return false;
+    if (!active_ || i < 0 || i >= N || d < 1 || d > 9 || locked(i)) return false;
 
     if (notes_mode) {
         if (value_[i]) return false;            // notes only on empty cells
@@ -84,20 +97,13 @@ bool Game::enter(int i, int d, bool notes_mode)
     }
     value_[i] = d;
     notes_[i] = 0;
-    // Auto-clear: d can no longer be a candidate anywhere it now sees.
-    const uint16_t bit = 1u << d;
-    for (int j = 0; j < N; ++j) {
-        if (j != i && (notes_[j] & bit) && same_unit(i, j)) {
-            record(j);
-            notes_[j] &= ~bit;
-        }
-    }
+    clear_peer_notes(i, d);
     return true;
 }
 
 bool Game::erase(int i)
 {
-    if (!active_ || i < 0 || i >= N || given(i)) return false;
+    if (!active_ || i < 0 || i >= N || locked(i)) return false;
     if (!value_[i] && !notes_[i]) return false;
     begin_action();
     record(i);
@@ -114,17 +120,62 @@ bool Game::undo()
         const Change& c = undo_[--undo_n_];
         value_[c.idx] = c.value;
         notes_[c.idx] = c.notes;
+        // Hinted cells are locked, so the only recorded change to one is the
+        // hint itself: undoing it un-hints the cell.
+        hinted_[c.idx] = 0;
     }
     return true;
 }
 
-// ---- Save layout (little-endian, version 1) --------------------------------
-//   u32 magic 'SUD1' | u8 difficulty | u8 active | u16 undo_n | u16 group
-//   u32 elapsed_s | puzzle[81] | solution[81] | value[81] | notes u16[81]
+bool Game::needs_hint(int i) const
+{
+    return !locked(i) && value_[i] != solution_.c[i];
+}
+
+int Game::hint_target(int preferred) const
+{
+    if (!active_ || solved()) return -1;
+    if (preferred >= 0 && preferred < N && needs_hint(preferred)) return preferred;
+    for (int i = 0; i < N; ++i)
+        if (value_[i] && needs_hint(i)) return i;          // a wrong entry
+    // No mistakes on the board, so candidates from the current values are
+    // trustworthy: point at the empty cell with the fewest of them.
+    int best = -1, best_n = 10;
+    for (int i = 0; i < N; ++i) {
+        if (value_[i]) continue;
+        uint16_t used = 0;
+        for (int j = 0; j < N; ++j)
+            if (value_[j] && same_unit(i, j)) used |= 1u << value_[j];
+        const int n = 9 - __builtin_popcount(used & 0x3FE);
+        if (n < best_n) { best = i; best_n = n; }
+    }
+    return best;
+}
+
+bool Game::apply_hint(int i)
+{
+    if (!active_ || i < 0 || i >= N || !needs_hint(i)) return false;
+    begin_action();
+    record(i);
+    value_[i] = solution_.c[i];
+    notes_[i] = 0;
+    hinted_[i] = 1;
+    if (hints_used_ < 255) ++hints_used_;
+    clear_peer_notes(i, value_[i]);
+    return true;
+}
+
+// ---- Save layout (little-endian) --------------------------------------------
+//   u32 magic 'SUD2' | u8 difficulty | u8 active | u16 undo_n | u16 group
+//   u32 elapsed_s | u8 hints_used | u8 hinted bits[11]
+//   puzzle[81] | solution[81] | value[81] | notes u16[81]
 //   Change[undo_n] (6 bytes each: idx, value, notes u16, group u16)
+// 'SUD1' (alpha.3-.6) is the same without the hint fields, and still loads.
 namespace {
-constexpr uint32_t kMagic = 0x31445553;  // "SUD1"
-constexpr size_t   kHeader = 4 + 1 + 1 + 2 + 2 + 4;
+constexpr uint32_t kMagic1 = 0x31445553;  // "SUD1"
+constexpr uint32_t kMagic  = 0x32445553;  // "SUD2"
+constexpr size_t   kHeader1 = 4 + 1 + 1 + 2 + 2 + 4;
+constexpr size_t   kHeader = kHeader1 + 1 + 11;
 constexpr size_t   kBody = 81 * 3 + 81 * 2;
 
 template <class T> void put(uint8_t*& p, T v) { memcpy(p, &v, sizeof v); p += sizeof v; }
@@ -144,6 +195,15 @@ size_t Game::serialize(uint8_t* buf, size_t cap) const
     put<uint16_t>(p, undo_n_);
     put<uint16_t>(p, group_);
     put<uint32_t>(p, elapsed_s_);
+    put<uint8_t>(p, hints_used_);
+    for (int b = 0; b < 11; ++b) {
+        uint8_t bits = 0;
+        for (int k = 0; k < 8; ++k) {
+            const int i = b * 8 + k;
+            if (i < N && hinted_[i]) bits |= 1u << k;
+        }
+        put<uint8_t>(p, bits);
+    }
     memcpy(p, puzzle_.c, 81);   p += 81;
     memcpy(p, solution_.c, 81); p += 81;
     memcpy(p, value_, 81);      p += 81;
@@ -159,15 +219,22 @@ size_t Game::serialize(uint8_t* buf, size_t cap) const
 
 bool Game::deserialize(const uint8_t* buf, size_t len)
 {
-    if (len < kHeader + kBody) return false;
+    if (len < kHeader1 + kBody) return false;
     const uint8_t* p = buf;
-    if (get<uint32_t>(p) != kMagic) return false;
+    const uint32_t magic = get<uint32_t>(p);
+    if (magic != kMagic && magic != kMagic1) return false;
+    const size_t header = (magic == kMagic) ? kHeader : kHeader1;
     const uint8_t d = get<uint8_t>(p);
     const uint8_t act = get<uint8_t>(p);
     const uint16_t un = get<uint16_t>(p);
     const uint16_t grp = get<uint16_t>(p);
     const uint32_t el = get<uint32_t>(p);
-    if (d > 3 || un > kUndoCap || len < kHeader + kBody + size_t(un) * 6) return false;
+    if (d > 3 || un > kUndoCap || len < header + kBody + size_t(un) * 6) return false;
+    uint8_t hints = 0, hbits[11] = {};
+    if (magic == kMagic) {
+        hints = get<uint8_t>(p);
+        for (int b = 0; b < 11; ++b) hbits[b] = get<uint8_t>(p);
+    }
 
     // Validate into a scratch copy, then commit. Static: a Game is ~4 KB,
     // too big for the ESP32's default task stack.
@@ -177,6 +244,8 @@ bool Game::deserialize(const uint8_t* buf, size_t len)
     g.undo_n_ = un;
     g.group_ = grp;
     g.elapsed_s_ = el;
+    g.hints_used_ = hints;
+    for (int i = 0; i < N; ++i) g.hinted_[i] = (hbits[i / 8] >> (i % 8)) & 1;
     memcpy(g.puzzle_.c, p, 81);   p += 81;
     memcpy(g.solution_.c, p, 81); p += 81;
     memcpy(g.value_, p, 81);      p += 81;

@@ -46,7 +46,17 @@
   labels in; menu is a 3-line hamburger in the top bar; colors come from
   `src/ui/theme.cpp` palettes (Light/Dark), never hard-coded elsewhere.
 - Settings the player picks (theme, input mode) are saved by
-  `src/app/settings_store.*` (`/ui_settings.bin`).
+  `src/app/settings_store.*` (`/ui_settings.bin`). Digit 1st is the default.
+- Stats: `src/game/stats.*` (CSV format + summary, host-tested) and
+  `src/app/stats_store.*` (SD `/CYD-Sudoku/stats.csv` if the board's SD is
+  usable and a card is in, else LittleFS `/stats.csv`, newest 250). SD access
+  is `src/hal/sdcard.*`, gated by `BOARD_SD_USABLE` in the board file.
+- Memory: LVGL allocates from the ESP32 heap (LV_STDLIB_CLIB). A fixed
+  LV_MEM_SIZE pool overflowed static DRAM once it needed > 64 KB. The PC
+  preview uses a fixed pool (-DCYD_PREVIEW) and prints per-screen usage -
+  check it when adding screens, and keep tables as one label per column
+  rather than objects per cell.
+- Game saves are format 'SUD2' (adds hints); 'SUD1' still loads.
 
 ## Known hardware issues
 - Tom's boards: 2.8" ESP32-2432S028 in both ILI9341 and ST7789 versions
@@ -61,7 +71,9 @@
   SPI, so SD on this board needs a bit-banged XPT2046 touch class or bus
   switching. LittleFS is used first for this reason.
 - ESP32-32E boards: touch shares the display's HSPI bus (CS 33); SD is on
-  VSPI by itself, so SD works there without conflict.
+  VSPI by itself, so SD works there (BOARD_SD_USABLE 1).
+- 2.8" SD (BOARD_SD_USABLE 0) needs a bit-banged XPT2046 touch driver first;
+  until then stats on the 2.8" go to LittleFS.
 - Tom uses a Nintendo DS Lite stylus with firm presses - NOT a finger.
   Don't explain touch problems with finger size or light pressure.
 - 4.0" first-tap offset (first tap after idle landed ~1 cell low or right):

@@ -12,8 +12,8 @@ uint8_t buf[game::Game::kUndoCap * 6 + 512];   // >= Game::max_serialized_size()
 
 bool save_store_load(game::Game& g)
 {
-    static_assert(sizeof(buf) >= 4 + 1 + 1 + 2 + 2 + 4 + 81 * 3 + 81 * 2 + game::Game::kUndoCap * 6,
-                  "save buffer too small");
+    static_assert(sizeof(buf) >= 4 + 1 + 1 + 2 + 2 + 4 + 1 + 11 + 81 * 3 + 81 * 2
+                                 + game::Game::kUndoCap * 6, "save buffer too small");
     if (!storage_begin() || !LittleFS.exists(kPath)) return false;
     File f = LittleFS.open(kPath, "r");
     if (!f) return false;

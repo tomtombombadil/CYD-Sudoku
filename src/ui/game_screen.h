@@ -5,6 +5,7 @@
 
 #include <cstdint>
 #include "game/game.h"
+#include "game/stats.h"
 #include "theme.h"
 
 namespace ui {
@@ -18,6 +19,10 @@ struct UiHooks {
     void (*recalibrate_touch)();               // may not return (device restarts)
     // Unfiltered touch reading for the touch test (nullptr = not available)
     bool (*raw_touch)(int16_t* x, int16_t* y);
+    // Play history (nullptr = no stats)
+    void (*record_stat)(const stats::Record&);
+    bool (*load_stats)(stats::Summary&);
+    const char* (*stats_location)();
     const char* firmware_version;
     const char* board_name;
 };
@@ -38,6 +43,8 @@ void game_screen_set_notes(bool on);
 void game_screen_set_input_mode(InputMode m);
 void game_screen_open_menu();
 void game_screen_open_settings();
+void game_screen_open_stats();
+void game_screen_hint();
 void game_screen_open_touch_test();
 void game_screen_close_overlays();
 

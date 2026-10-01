@@ -8,26 +8,49 @@ A polished, touch-friendly Sudoku for the ESP32 "Cheap Yellow Display" family.
 ## How to play
 
 The screen, top to bottom: clock, difficulty and the **☰ menu**; the board;
-the tool row; the digits 1-9.
+the tool row (**Undo**, **Notes**, input mode, **Hint**); the digits 1-9.
 
-- **Input mode** (tool row, **Cell | Digit**), remembered between games:
-  - **Cell** (cell first): tap a cell, then a digit. Tap the same digit again
-    to clear it.
-  - **Digit** (digit first): tap a digit, then tap cells to place it. Tap a
-    cell that already holds that digit to clear it; a different digit is
-    replaced. Tap the highlighted digit again to put it down.
+- **Input mode** — the third button shows the current mode; tap it to switch.
+  Remembered between games. **Digit 1st** is the default.
+  - **Digit 1st:** tap a digit, then tap cells to place it. Tap a cell that
+    already holds that digit to clear it; a different digit is replaced.
+    Picking a digit clears the cell highlight.
+  - **Cell 1st:** tap a cell, then a digit. Tap the same digit again to
+    clear it.
 - **Notes:** while on, digits add or remove pencil marks instead of answers.
   Placing a digit removes it from the notes in its row, column and box.
 - **Undo** steps back one action. Undoing a placement also brings back the
   notes it cleared.
-- The small number under each digit is **how many of that digit are left to
-  place** (9 minus how many are on the board, right or wrong). A digit
-  button greys out once all nine are placed correctly.
-- Clashing digits are tinted red.
-- **☰ menu:** new game (Easy, Medium, Hard, Expert), restart, and
+- **Hint:** the first tap points at a cell (the top bar says "Tap Hint to
+  fill"); a second tap fills in the right digit, shown in green and locked.
+  It points at your selected cell if that one is empty or wrong, else at a
+  wrong entry if there is one, else at the easiest empty cell. Hints are
+  counted in your stats.
+- On the 3.5" and 4.0" boards the small number under each digit is how many
+  of that digit are left to place. The 2.8"/3.2" boards leave it out so the
+  board can be bigger.
+- Clashing digits are tinted red. A digit button greys out once all nine are
+  placed correctly.
+- **Solving** flashes the screen twice and leaves the finished board on
+  screen. Open the ☰ menu when you're ready for a new game.
+- **☰ menu:** new game (Easy, Medium, Hard, Expert), restart, **Stats**, and
   **Display & touch** (Light/Dark theme, panel color fixes, touch
   calibration, touch test). The game saves itself and picks up where you
   left off.
+
+## Stats
+
+Every solved puzzle is recorded with its difficulty, time and hints used. So
+is every puzzle you leave for a new game after playing it (marked "Gave up").
+The Stats screen shows solves, average and best time per difficulty, and
+your most recent games.
+
+- **With a microSD card** (3.2", 3.5" and 4.0" boards): saved to
+  `CYD-Sudoku/stats.csv` on the card, full history, opens in Excel.
+  Anything recorded before the card went in is moved onto it.
+- **Without a card**, and on the 2.8" boards for now: saved in the board's
+  memory (the most recent 250 games). The 2.8" board's SD slot shares a
+  controller with its touch screen and needs a driver change first.
 
 ## Install
 

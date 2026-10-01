@@ -4,6 +4,7 @@
 #include <lvgl.h>
 #include "app/save_store.h"
 #include "app/settings_store.h"
+#include "app/stats_store.h"
 #include "game/game.h"
 #include "hal/lvgl_port.h"
 #include "hal/panel_prefs.h"
@@ -85,6 +86,9 @@ void setup()
     hooks.toggle_swap_rb    = toggle_swap_rb;
     hooks.recalibrate_touch = recalibrate;
     hooks.raw_touch         = lvgl_port_raw_touch;
+    hooks.record_stat       = stats_store_record;
+    hooks.load_stats        = stats_store_load;
+    hooks.stats_location    = stats_store_location;
     hooks.firmware_version  = CYD_SUDOKU_VERSION;
     hooks.board_name        = BOARD_NAME;
     ui::game_screen_create(the_game, hooks, settings_store_load());

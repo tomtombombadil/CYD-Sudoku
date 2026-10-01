@@ -11,8 +11,17 @@
 /* ---- Color and memory ---------------------------------------------------- */
 #define LV_COLOR_FORMAT_DEFAULT LV_COLOR_FORMAT_RGB565  /* 16-bit: what every CYD panel takes */
 
+/* On the device LVGL allocates from the ESP32 heap (malloc). A fixed pool
+ * (LV_STDLIB_BUILTIN) has to fit in the static DRAM region, which overflowed
+ * once the pool needed to grow past 64 KB (the Stats screen ran it out).
+ * The PC preview (tools/preview, -DCYD_PREVIEW) keeps a fixed pool so it can
+ * measure how much each screen uses. */
+#ifdef CYD_PREVIEW
 #define LV_USE_STDLIB_MALLOC LV_STDLIB_BUILTIN
-#define LV_MEM_SIZE (64 * 1024U)          /* LVGL's private heap for widgets/styles */
+#define LV_MEM_SIZE (88 * 1024U)
+#else
+#define LV_USE_STDLIB_MALLOC LV_STDLIB_CLIB
+#endif
 
 /* Only formats we actually render; trims flash. */
 #define LV_DRAW_SW_SUPPORT_RGB565          1

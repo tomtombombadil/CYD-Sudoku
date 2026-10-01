@@ -25,6 +25,10 @@
 #define BOARD_LED_ACTIVE_LOW  1
 #define BOARD_PIN_LDR         34
 #define BOARD_PIN_SD_CS       5
+// The SD slot (VSPI pins 18/19/23/5) can't be used yet: touch also runs on
+// the VSPI controller (pins 25/32/39/33) and LovyanGFX's XPT2046 driver has
+// no software-SPI option. Needs a bit-banged touch driver first.
+#define BOARD_SD_USABLE       0
 
 template <class PanelT, bool kInvert>
 class LGFX_Esp32_2432S028 : public lgfx::LGFX_Device

@@ -10,8 +10,9 @@
 //   BOARD_NAME                              e.g. "3.2\" ST7789 Resistive"
 //   BOARD_TOUCH_RESISTIVE                   1 = XPT2046 (calibrate, no gestures)
 //   BOARD_PIN_BOOT_BTN                      held at power-up to recalibrate touch
+//   BOARD_SD_USABLE                         1 = SD slot works (needs BOARD_PIN_SD_*)
 // Optional: BOARD_PIN_LED_*, BOARD_LED_ACTIVE_LOW, BOARD_PIN_LDR,
-//           BOARD_PIN_SD_CS, BOARD_PIN_AUDIO_EN, BOARD_PIN_BATTERY_ADC
+//           BOARD_PIN_SD_CS/SCK/MISO/MOSI, BOARD_PIN_AUDIO_EN, BOARD_PIN_BATTERY_ADC
 //
 // Colors: each board's default inversion is a best guess. If a particular
 // unit shows a negative image or swapped red/blue, fix it on the device

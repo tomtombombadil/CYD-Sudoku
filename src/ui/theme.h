@@ -17,12 +17,12 @@ enum class InputMode : uint8_t { CellFirst = 0, DigitFirst = 1 };
 // Saved on the device by the app (see src/app/settings_store.*)
 struct UiSettings {
     Theme     theme = Theme::Light;
-    InputMode input = InputMode::CellFirst;
+    InputMode input = InputMode::DigitFirst;   // Tom's choice for the default
 };
 
 struct Palette {
     lv_color_t screen, cell, line_thin, line_thick;
-    lv_color_t given, entry, note, note_match;      // note_match: note = highlighted digit
+    lv_color_t given, entry, hinted, note, note_match;  // note_match: note = highlighted digit
     lv_color_t conflict, conflict_bg;
     lv_color_t peer, same, selected;
     lv_color_t key, key_border, key_pressed, key_on, key_on_text, key_dim_text;

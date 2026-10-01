@@ -27,6 +27,10 @@
 #define BOARD_PIN_LED_B         17
 #define BOARD_LED_ACTIVE_LOW    1
 #define BOARD_PIN_SD_CS         5
+#define BOARD_PIN_SD_SCK        18
+#define BOARD_PIN_SD_MISO       19
+#define BOARD_PIN_SD_MOSI       23
+#define BOARD_SD_USABLE         1    // SD has VSPI to itself here
 #define BOARD_PIN_AUDIO_EN      4    // low = amplifier on
 #define BOARD_PIN_BATTERY_ADC   34
 

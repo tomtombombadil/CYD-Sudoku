@@ -20,6 +20,7 @@ void build()
     l.line_thick   = lv_color_hex(0x1E232B);
     l.given        = lv_color_hex(0x1E232B);
     l.entry        = lv_color_hex(0x1A52AA);
+    l.hinted       = lv_color_hex(0x13804A);
     l.note         = lv_color_hex(0x4E5663);
     l.note_match   = lv_color_hex(0x000000);
     l.conflict     = lv_color_hex(0xC01818);
@@ -43,6 +44,7 @@ void build()
     d.line_thick   = lv_color_hex(0xA7B0BC);
     d.given        = lv_color_hex(0xEEF0F3);
     d.entry        = lv_color_hex(0x8CC0FF);
+    d.hinted       = lv_color_hex(0x6FD69E);
     d.note         = lv_color_hex(0xA9B1BC);
     d.note_match   = lv_color_hex(0xFFFFFF);
     d.conflict     = lv_color_hex(0xFF8A8A);
