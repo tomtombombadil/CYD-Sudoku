@@ -56,6 +56,12 @@
   switching. LittleFS is used first for this reason.
 - ESP32-32E boards: touch shares the display's HSPI bus (CS 33); SD is on
   VSPI by itself, so SD works there without conflict.
+- Resistive touch: the first reading at contact is inaccurate (Tom saw
+  first taps land wrong on the 4.0"). lvgl_port.cpp only starts a press
+  after two consecutive readings agree within 8 px and ends it after two
+  empty readings. Keep that filter; don't act on raw first readings.
+  ESP32-32E touch clock is 1 MHz (2.5 MHz read worse on the 4.0").
+  `-D CYD_TOUCH_DEBUG` logs raw touches to the serial monitor.
 - Panel inversion / red-blue order differ between production runs. They are
   fixed per unit on the device (src/hal/panel_prefs.*, saved to LittleFS),
   not with build flags.

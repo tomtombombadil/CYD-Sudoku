@@ -97,7 +97,9 @@ public:
             cfg.bus_shared      = true;
             cfg.offset_rotation = 0;
             cfg.spi_host        = HSPI_HOST;
-            cfg.freq            = 2500000;
+            // 1 MHz, not the XPT2046's 2.5 MHz max: the larger panels need
+            // the extra settling time per sample for accurate readings.
+            cfg.freq            = 1000000;
             cfg.pin_sclk        = 14;
             cfg.pin_mosi        = 13;
             cfg.pin_miso        = 12;

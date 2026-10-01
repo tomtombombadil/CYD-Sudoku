@@ -27,19 +27,68 @@ void flush_cb(lv_display_t* d, const lv_area_t* area, uint8_t* px_map)
 // ---- Touch ---------------------------------------------------------------
 // LovyanGFX already applies calibration and the current rotation, so the
 // coordinates go straight to LVGL (LVGL's own rotation is left at 0).
+//
+// Resistive panels read wrong at the instant of contact: the layers are only
+// lightly touching and the reading is pulled off target. LVGL acts on the
+// first PRESSED point, so that bad reading would pick the wrong cell or
+// button. So a press only starts once two consecutive readings agree, and a
+// release needs two consecutive "no touch" readings (resistive panels drop
+// out for a frame mid-press, which would otherwise look like a second tap).
+constexpr int kAgreePx   = 8;   // two readings this close = steady
+constexpr int kReleaseN  = 2;   // empty readings needed to end a press
+
+struct TouchFilter {
+    bool    down = false;
+    bool    have_candidate = false;
+    int16_t cx = 0, cy = 0;     // candidate first reading
+    int16_t x = 0, y = 0;       // last reported point
+    uint8_t empty = 0;
+} tf;
+
 void touch_read_cb(lv_indev_t*, lv_indev_data_t* data)
 {
     // On boards where touch shares the display's SPI bus, the bus must be
     // idle before LovyanGFX briefly hands it to the touch controller.
     gfx.waitDMA();
     lgfx::touch_point_t tp;
-    if (gfx.getTouch(&tp, 1)) {
+    const bool raw = gfx.getTouch(&tp, 1);
+
+#ifdef CYD_TOUCH_DEBUG
+    if (raw) Serial.printf("[touch] %d,%d size %d\n", tp.x, tp.y, tp.size);
+#endif
+
+#if BOARD_TOUCH_RESISTIVE
+    if (raw) {
+        tf.empty = 0;
+        if (tf.down) {
+            tf.x = tp.x;
+            tf.y = tp.y;
+        } else if (tf.have_candidate && abs(tp.x - tf.cx) <= kAgreePx
+                                     && abs(tp.y - tf.cy) <= kAgreePx) {
+            tf.down = true;                    // steady: start the press here
+            tf.x = tp.x;
+            tf.y = tp.y;
+        } else {
+            tf.have_candidate = true;          // first (or unsteady) reading
+            tf.cx = tp.x;
+            tf.cy = tp.y;
+        }
+    } else {
+        tf.have_candidate = false;
+        if (tf.down && ++tf.empty >= kReleaseN) tf.down = false;
+    }
+    data->point.x = tf.x;
+    data->point.y = tf.y;
+    data->state   = tf.down ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED;
+#else
+    if (raw) {
         data->point.x = tp.x;
         data->point.y = tp.y;
         data->state   = LV_INDEV_STATE_PRESSED;
     } else {
         data->state   = LV_INDEV_STATE_RELEASED;
     }
+#endif
 }
 
 uint32_t tick_cb() { return millis(); }
