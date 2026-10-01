@@ -7,7 +7,9 @@
 namespace {
 
 constexpr const char* kPath  = "/panel_prefs.bin";
-constexpr uint32_t    kMagic = 0x50504631;  // "PPF1"
+// Bump when board color defaults change, so fixes saved against the old
+// defaults are ignored instead of double-applied.
+constexpr uint32_t    kMagic = 0x50504632;  // "PPF2"
 
 struct PrefsFile {
     uint32_t magic;

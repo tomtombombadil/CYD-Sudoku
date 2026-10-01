@@ -30,7 +30,8 @@
 #define BOARD_PIN_AUDIO_EN      4    // low = amplifier on
 #define BOARD_PIN_BATTERY_ADC   34
 
-template <class PanelT, int kWidth, int kHeight, bool kInvert>
+// kRgbOrder: LovyanGFX rgb_order (false = BGR, true = RGB)
+template <class PanelT, int kWidth, int kHeight, bool kInvert, bool kRgbOrder>
 class LGFX_Esp32_32E : public lgfx::LGFX_Device
 {
     PanelT              _panel;
@@ -71,7 +72,7 @@ public:
             cfg.offset_rotation  = 0;
             cfg.readable         = true;
             cfg.invert           = kInvert;
-            cfg.rgb_order        = false;  // false = BGR in LovyanGFX
+            cfg.rgb_order        = kRgbOrder;
             cfg.dlen_16bit       = false;
             cfg.bus_shared       = true;   // touch is on this bus too
             _panel.config(cfg);

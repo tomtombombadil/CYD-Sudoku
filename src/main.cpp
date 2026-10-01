@@ -74,6 +74,17 @@ lv_obj_t* text_button(lv_obj_t* parent, const char* text, lv_event_cb_t cb)
     return btn;
 }
 
+// Label that wraps to the column width (needed on 240-px-wide screens)
+lv_obj_t* wrap_label(lv_obj_t* parent, const char* text)
+{
+    lv_obj_t* l = lv_label_create(parent);
+    lv_label_set_long_mode(l, LV_LABEL_LONG_MODE_WRAP);
+    lv_obj_set_width(l, lv_pct(100));
+    lv_obj_set_style_text_align(l, LV_TEXT_ALIGN_CENTER, 0);
+    lv_label_set_text(l, text);
+    return l;
+}
+
 lv_obj_t* color_bar(lv_obj_t* parent, lv_color_t c, const char* text)
 {
     lv_obj_t* bar = lv_obj_create(parent);
@@ -118,7 +129,7 @@ void build_test_screen()
     lv_obj_set_style_text_font(title, &lv_font_montserrat_28, 0);
     lv_obj_set_style_text_color(title, lv_color_white(), 0);
 
-    lv_obj_t* info = lv_label_create(col);
+    lv_obj_t* info = wrap_label(col, "");
     lv_label_set_text_fmt(info, "%s\n%ldx%ld  fw " CYD_SUDOKU_VERSION,
                           BOARD_NAME,
                           (long)lv_display_get_horizontal_resolution(nullptr),
@@ -138,12 +149,10 @@ void build_test_screen()
     color_bar(bars, lv_color_hex(0x00a000), "Green");
     color_bar(bars, lv_color_hex(0x0000d0), "Blue");
 
-    touch_label = lv_label_create(col);
-    lv_label_set_text(touch_label, "Touch anywhere");
+    touch_label = wrap_label(col, "Touch anywhere");
     lv_obj_set_style_text_color(touch_label, lv_color_white(), 0);
 
-    lv_obj_t* hint = lv_label_create(col);
-    lv_label_set_text(hint, "Expect: dark background, R G B bars");
+    lv_obj_t* hint = wrap_label(col, "Expect a dark background and bars in red, green, blue order");
     lv_obj_set_style_text_font(hint, &lv_font_montserrat_14, 0);
     lv_obj_set_style_text_color(hint, lv_color_hex(0xb8c4d0), 0);
     lv_obj_set_style_text_align(hint, LV_TEXT_ALIGN_CENTER, 0);

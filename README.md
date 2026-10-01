@@ -27,8 +27,9 @@ text printed on the back of the board.
 | `CYD_3.5in_ST7796_Resistive.bin` | 3.5" LCD Display, ESP32-32E, 320x480, Resistive Touch |
 | `CYD_4.0in_ST7796_Resistive.bin` | 4.0" LCD Display, ESP32-32E, 320x480, Resistive Touch |
 
-NM-CYD-C5 (ESP32-C5) support is planned. All builds are new and not yet
-confirmed on hardware.
+Confirmed working: 2.8" ST7789, 3.2" ST7789, 4.0" ST7796. The 2.8" ILI9341
+and 3.5" ST7796 builds haven't been tested on hardware yet. NM-CYD-C5
+(ESP32-C5) support is planned.
 
 Not sure which 2.8" you have? Try ILI9341 first. Wrong colors: use the
 **Invert** / **Swap R/B** buttons. Garbled or blank screen: install the
