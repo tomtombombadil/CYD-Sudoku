@@ -8,16 +8,43 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write   # needed to publish releases on tags
+  contents: read
 
 jobs:
+  # Board list comes from platformio.ini: every env with custom_firmware_name.
+  boards:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.list.outputs.matrix }}
+      version: ${{ steps.ver.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: list
+        run: |
+          python3 - <<'EOF' >> "$GITHUB_OUTPUT"
+          import configparser, json
+          c = configparser.ConfigParser(interpolation=None, strict=False)
+          c.read("platformio.ini", encoding="utf-8")
+          inc = [{"env": s[4:], "name": c[s]["custom_firmware_name"]}
+                 for s in c.sections()
+                 if s.startswith("env:") and c[s].get("custom_firmware_name")]
+          print("matrix=" + json.dumps({"include": inc}))
+          EOF
+      - id: ver
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "version=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=dev-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
+    needs: boards
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      matrix:
-        # Add an env here once its src/boards/ file exists.
-        env: [cyd28_ili9341, cyd28_st7789, lcdwiki32_st7789, lcdwiki35_st7796, lcdwiki40_st7796]
+      matrix: ${{ fromJson(needs.boards.outputs.matrix) }}
+    name: build (${{ matrix.name }})
     steps:
       - uses: actions/checkout@v4
 
@@ -35,35 +62,29 @@ jobs:
       - name: Install PlatformIO
         run: python -m pip install --upgrade platformio
 
-      - name: Set version
-        id: ver
-        run: |
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            echo "version=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
-          else
-            echo "version=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Build ${{ matrix.env }}
+      - name: Build
         env:
-          PLATFORMIO_BUILD_SRC_FLAGS: -D CYD_SUDOKU_VERSION=\"${{ steps.ver.outputs.version }}\"
+          PLATFORMIO_BUILD_SRC_FLAGS: -D CYD_SUDOKU_VERSION=\"${{ needs.boards.outputs.version }}\"
         run: pio run -e ${{ matrix.env }}
 
-      - name: Collect firmware
+      - name: Name firmware
         run: |
           mkdir -p out
-          cp .pio/build/${{ matrix.env }}/firmware.factory.bin \
-             out/cyd-sudoku-${{ matrix.env }}-${{ steps.ver.outputs.version }}.bin
+          cp .pio/build/${{ matrix.env }}/firmware.factory.bin "out/${{ matrix.name }}.bin"
 
       - uses: actions/upload-artifact@v4
         with:
           name: fw-${{ matrix.env }}
           path: out/*.bin
 
+  # Tagged builds become a GitHub release. Tags with a hyphen
+  # (v0.1.0-alpha.1) are marked pre-release.
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: build
+    needs: [boards, build]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -72,4 +93,38 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           files: out/*.bin
+          prerelease: ${{ contains(github.ref_name, '-') }}
           generate_release_notes: true
+          body: |
+            **Easiest install:** https://tomtombombadil.github.io/CYD-Sudoku/ (Chrome or Edge).
+
+            Or download the `.bin` for your board and flash it at address **0x0**.
+            Files are named by screen size, display driver and touch type.
+
+  # Web flasher on GitHub Pages: always the newest build from main or a tag.
+  pages:
+    if: github.event_name == 'push'
+    needs: [boards, build]
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    concurrency:
+      group: pages
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: bins
+          merge-multiple: true
+      - name: Assemble site
+        run: python3 tools/make_site.py --bins bins --version "${{ needs.boards.outputs.version }}" --out _site
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deploy
+        uses: actions/deploy-pages@v4

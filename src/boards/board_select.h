@@ -1,9 +1,13 @@
 // Selects the hardware definition for the board chosen in platformio.ini.
 // This is the ONLY file that tests CYD_BOARD_* flags.
 //
+// Boards are named by what a user can identify: screen size, display driver,
+// touch type. BOARD_NAME matches the firmware file name shown in releases
+// and the web flasher (e.g. CYD_3.2in_ST7789_Resistive.bin).
+//
 // Every board must end up defining:
 //   class LGFX : public lgfx::LGFX_Device   display + touch + backlight
-//   BOARD_NAME                              human-readable name
+//   BOARD_NAME                              e.g. "3.2\" ST7789 Resistive"
 //   BOARD_TOUCH_RESISTIVE                   1 = XPT2046 (calibrate, no gestures)
 //   BOARD_PIN_BOOT_BTN                      held at power-up to recalibrate touch
 // Optional: BOARD_PIN_LED_*, BOARD_LED_ACTIVE_LOW, BOARD_PIN_LDR,
@@ -19,30 +23,33 @@
 #define CYD_SPI_WRITE_HZ 40000000
 #endif
 
-#if defined(CYD_BOARD_SUNTON_2432S028_ILI9341)
-  #include "sunton_cyd28.hpp"
-  #define BOARD_NAME "ESP32-2432S028 2.8\" ILI9341"
-  class LGFX : public LGFX_SuntonCYD28<lgfx::Panel_ILI9341, false> {};
+// ---- 2.8" ESP32-2432S028 (the original CYD layout) ---------------------------
+#if defined(CYD_BOARD_28_ILI9341_RES)
+  #include "esp32_2432s028.hpp"
+  #define BOARD_NAME "2.8\" ILI9341 Resistive"
+  class LGFX : public LGFX_Esp32_2432S028<lgfx::Panel_ILI9341, false> {};
 
-#elif defined(CYD_BOARD_SUNTON_2432S028_ST7789)
-  #include "sunton_cyd28.hpp"
-  #define BOARD_NAME "ESP32-2432S028 2.8\" ST7789"
-  class LGFX : public LGFX_SuntonCYD28<lgfx::Panel_ST7789, false> {};
+#elif defined(CYD_BOARD_28_ST7789_RES)
+  #include "esp32_2432s028.hpp"
+  #define BOARD_NAME "2.8\" ST7789 Resistive"
+  class LGFX : public LGFX_Esp32_2432S028<lgfx::Panel_ST7789, false> {};
 
-#elif defined(CYD_BOARD_LCDWIKI_E32R32P)
-  #include "lcdwiki_esp32e.hpp"
-  #define BOARD_NAME "LCDwiki E32R32P 3.2\" ST7789"   // IPS panel: needs inversion on
-  class LGFX : public LGFX_LcdwikiEsp32E<lgfx::Panel_ST7789P3, 240, 320, true> {};
+// ---- "ESP32-32E" display boards ---------------------------------------------
+#elif defined(CYD_BOARD_32_ST7789_RES)
+  #include "esp32_32e_display.hpp"
+  #define BOARD_NAME "3.2\" ST7789 Resistive"
+  // IPS panel: inversion on by default
+  class LGFX : public LGFX_Esp32_32E<lgfx::Panel_ST7789P3, 240, 320, true> {};
 
-#elif defined(CYD_BOARD_LCDWIKI_E32R35T)
-  #include "lcdwiki_esp32e.hpp"
-  #define BOARD_NAME "LCDwiki E32R35T 3.5\" ST7796"
-  class LGFX : public LGFX_LcdwikiEsp32E<lgfx::Panel_ST7796, 320, 480, false> {};
+#elif defined(CYD_BOARD_35_ST7796_RES)
+  #include "esp32_32e_display.hpp"
+  #define BOARD_NAME "3.5\" ST7796 Resistive"
+  class LGFX : public LGFX_Esp32_32E<lgfx::Panel_ST7796, 320, 480, false> {};
 
-#elif defined(CYD_BOARD_LCDWIKI_E32R40T)
-  #include "lcdwiki_esp32e.hpp"
-  #define BOARD_NAME "LCDwiki E32R40T 4.0\" ST7796"
-  class LGFX : public LGFX_LcdwikiEsp32E<lgfx::Panel_ST7796, 320, 480, false> {};
+#elif defined(CYD_BOARD_40_ST7796_RES)
+  #include "esp32_32e_display.hpp"
+  #define BOARD_NAME "4.0\" ST7796 Resistive"
+  class LGFX : public LGFX_Esp32_32E<lgfx::Panel_ST7796, 320, 480, false> {};
 
 #elif defined(CYD_BOARD_NM_CYD_C5)
   #error "NM-CYD-C5 is listed in platformio.ini but its board file is not written yet."
