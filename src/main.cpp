@@ -80,6 +80,7 @@ void setup()
     hooks.toggle_invert     = toggle_invert;
     hooks.toggle_swap_rb    = toggle_swap_rb;
     hooks.recalibrate_touch = recalibrate;
+    hooks.raw_touch         = lvgl_port_raw_touch;
     hooks.firmware_version  = CYD_SUDOKU_VERSION;
     hooks.board_name        = BOARD_NAME;
     ui::game_screen_create(the_game, hooks);

@@ -14,6 +14,8 @@ struct UiHooks {
     void (*toggle_invert)();          // display color fixes
     void (*toggle_swap_rb)();
     void (*recalibrate_touch)();      // may not return (device restarts)
+    // Unfiltered touch reading for the touch test (nullptr = not available)
+    bool (*raw_touch)(int16_t* x, int16_t* y);
     const char* firmware_version;
     const char* board_name;
 };
@@ -31,6 +33,7 @@ void game_screen_set_notes(bool on);
 void game_screen_set_brush(bool on);
 void game_screen_open_menu();
 void game_screen_open_settings();
+void game_screen_open_touch_test();
 void game_screen_close_overlays();
 
 } // namespace ui

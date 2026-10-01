@@ -56,11 +56,15 @@
   switching. LittleFS is used first for this reason.
 - ESP32-32E boards: touch shares the display's HSPI bus (CS 33); SD is on
   VSPI by itself, so SD works there without conflict.
-- Resistive touch: the first reading at contact is inaccurate (Tom saw
-  first taps land wrong on the 4.0"). lvgl_port.cpp only starts a press
-  after two consecutive readings agree within 8 px and ends it after two
-  empty readings. Keep that filter; don't act on raw first readings.
-  ESP32-32E touch clock is 1 MHz (2.5 MHz read worse on the 4.0").
+- Tom uses a Nintendo DS Lite stylus with firm presses - NOT a finger.
+  Don't explain touch problems with finger size or light pressure.
+- 4.0" (and maybe others): the FIRST tap after idle consistently lands about
+  one cell low or one cell right; the next tap is correct, sometimes it takes
+  three. Cause not yet known (as of v0.1.0-alpha.4). Mitigations in place:
+  press starts only after two consecutive readings agree within 8 px, ends
+  after two empty readings; ESP32-32E touch clock 1 MHz. Diagnostic:
+  Menu > Display & touch > Touch test plots raw readings (first one red)
+  and prints how far the first reading was from where the tap settled.
   `-D CYD_TOUCH_DEBUG` logs raw touches to the serial monitor.
 - Panel inversion / red-blue order differ between production runs. They are
   fixed per unit on the device (src/hal/panel_prefs.*, saved to LittleFS),

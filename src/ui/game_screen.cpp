@@ -1,6 +1,7 @@
 #include "game_screen.h"
 
 #include <cstdio>
+#include <cstring>
 #include <lvgl.h>
 #include "board_view.h"
 #include "theme.h"
@@ -300,6 +301,7 @@ void menu_cb(lv_event_t* e)
             if (H.save) H.save(*G);
             if (H.recalibrate_touch) H.recalibrate_touch();
             break;
+        case 7: game_screen_open_touch_test(); break;
     }
 }
 
@@ -398,6 +400,87 @@ void build_layout()
     }
 }
 
+// ---- Touch test -------------------------------------------------------------
+// Plots every raw reading during a tap (first reading red, the rest blue) and
+// reports how far the first reading was from where the tap settled. Raw =
+// calibrated but not filtered, so this shows what the hardware reports.
+constexpr int kMaxDots = 160;
+constexpr int kMaxSamples = 64;
+lv_obj_t*   tt_dots[kMaxDots] = {};
+int         tt_dot_next = 0;
+lv_obj_t*   tt_info = nullptr;
+lv_timer_t* tt_timer = nullptr;
+int16_t     tt_x[kMaxSamples], tt_y[kMaxSamples];
+int         tt_n = 0;
+int         tt_misses = 0;           // empty readings since the last touch
+char        tt_log[4][48];
+int         tt_log_n = 0;
+
+void tt_dot(int16_t x, int16_t y, bool first)
+{
+    lv_obj_t*& d = tt_dots[tt_dot_next];
+    tt_dot_next = (tt_dot_next + 1) % kMaxDots;
+    if (!d) {
+        d = lv_obj_create(overlay);
+        lv_obj_remove_style_all(d);
+        lv_obj_set_style_radius(d, LV_RADIUS_CIRCLE, 0);
+        lv_obj_set_style_bg_opa(d, LV_OPA_COVER, 0);
+        lv_obj_set_clickable(d, false);
+        lv_obj_set_ignore_layout(d, true);
+    }
+    const int r = first ? 4 : 2;
+    // Positions are relative to the overlay's content area: remove padding
+    const int px = lv_obj_get_style_pad_left(overlay, LV_PART_MAIN);
+    const int py = lv_obj_get_style_pad_top(overlay, LV_PART_MAIN);
+    lv_obj_set_size(d, 2 * r + 1, 2 * r + 1);
+    lv_obj_set_pos(d, x - r - px, y - r - py);
+    lv_obj_set_style_bg_color(d, first ? c_conflict() : c_entry(), 0);
+    if (first) lv_obj_move_foreground(d);
+}
+
+void tt_finish_tap()
+{
+    if (tt_n == 0) return;
+    // "Settled" position = median of the second half of the readings
+    int16_t xs[kMaxSamples], ys[kMaxSamples];
+    const int from = tt_n / 2, m = tt_n - from;
+    for (int k = 0; k < m; ++k) { xs[k] = tt_x[from + k]; ys[k] = tt_y[from + k]; }
+    for (int a = 0; a < m; ++a) for (int b = a + 1; b < m; ++b) {
+        if (xs[b] < xs[a]) { int16_t t = xs[a]; xs[a] = xs[b]; xs[b] = t; }
+        if (ys[b] < ys[a]) { int16_t t = ys[a]; ys[a] = ys[b]; ys[b] = t; }
+    }
+    const int sx = xs[m / 2], sy = ys[m / 2];
+    // Shift the log and add this tap
+    for (int k = 3; k > 0; --k) memcpy(tt_log[k], tt_log[k - 1], sizeof tt_log[0]);
+    snprintf(tt_log[0], sizeof tt_log[0], "First off by %+d,%+d (%d reads)",
+             tt_x[0] - sx, tt_y[0] - sy, tt_n);
+    if (tt_log_n < 4) ++tt_log_n;
+    char text[220];
+    int len = snprintf(text, sizeof text, "Red dot = first reading of a tap.");
+    for (int k = 0; k < tt_log_n && len < (int)sizeof text; ++k)
+        len += snprintf(text + len, sizeof text - len, "\n%s", tt_log[k]);
+    lv_label_set_text(tt_info, text);
+    tt_n = 0;
+}
+
+void tt_timer_cb(lv_timer_t*)
+{
+    int16_t x, y;
+    if (H.raw_touch && H.raw_touch(&x, &y)) {
+        tt_misses = 0;
+        if (tt_n < kMaxSamples) { tt_x[tt_n] = x; tt_y[tt_n] = y; }
+        tt_dot(x, y, tt_n == 0);
+        if (tt_n < kMaxSamples) ++tt_n;
+    } else if (tt_n && ++tt_misses >= 3) {   // 30 ms without touch = tap over
+        tt_finish_tap();
+    }
+}
+
+void tt_close_cb(lv_event_t*)
+{
+    game_screen_open_settings();            // closing the overlay stops the test
+}
+
 } // namespace
 
 // ---- Public -------------------------------------------------------------------
@@ -474,6 +557,7 @@ void game_screen_open_settings()
     overlay_button(overlay, "Invert colors", menu_cb, 4);
     overlay_button(overlay, "Swap red and blue", menu_cb, 5);
     overlay_button(overlay, "Recalibrate touch", menu_cb, 6);
+    if (H.raw_touch) overlay_button(overlay, "Touch test", menu_cb, 7);
     overlay_button(overlay, "Back", menu_cb, 3, true);
     char info[96];
     snprintf(info, sizeof info, "%s\nFirmware %s", H.board_name ? H.board_name : "",
@@ -481,8 +565,27 @@ void game_screen_open_settings()
     overlay_text(info, true);
 }
 
+void game_screen_open_touch_test()
+{
+    overlay_begin("Touch test");
+    tt_info = overlay_text("Tap anywhere. Red dot = first reading of a tap, blue = the rest.", true);
+    tt_n = tt_misses = tt_log_n = tt_dot_next = 0;
+    for (auto& d : tt_dots) d = nullptr;
+    lv_obj_t* done = make_key(overlay, lv_pct(100), menu_btn_h(), tt_close_cb, 0);
+    lv_obj_add_state(done, LV_STATE_CHECKED);
+    key_label(done, "Done", menu_font());
+    lv_obj_set_ignore_layout(done, true);
+    lv_obj_align(done, LV_ALIGN_BOTTOM_MID, 0, 0);
+    tt_timer = lv_timer_create(tt_timer_cb, 10, nullptr);
+}
+
 void game_screen_close_overlays()
 {
+    if (tt_timer) {                          // touch test running
+        lv_timer_delete(tt_timer);
+        tt_timer = nullptr;
+        for (auto& d : tt_dots) d = nullptr; // children of the overlay
+    }
     if (overlay) {
         // Async: this often runs inside a click handler of a button that
         // lives on the overlay being removed.

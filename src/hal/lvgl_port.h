@@ -18,5 +18,9 @@ lv_display_t* lvgl_port_init(uint8_t rotation);
 // time LVGL wants to run.
 uint32_t lvgl_port_loop();
 
+// One unfiltered touch reading in screen coordinates (calibration and
+// rotation applied, no press filtering). For the touch test screen.
+bool lvgl_port_raw_touch(int16_t* x, int16_t* y);
+
 // Backlight 0-255.
 void lvgl_port_set_brightness(uint8_t level);

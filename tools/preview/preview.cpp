@@ -36,6 +36,20 @@ static void shot(const std::string& path)
 }
 
 static uint32_t seed() { return 4242; }
+
+// Simulated stylus taps for the touch-test screenshot: the first reading of
+// each tap lands one cell low, the rest on target (Tom's 4.0" symptom).
+static int fake_step = -1;
+static bool fake_touch(int16_t* x, int16_t* y)
+{
+    static const int16_t taps[3][2] = {{100, 200}, {200, 300}, {60, 380}};
+    if (fake_step < 0) return false;
+    const int tap = fake_step / 14, k = fake_step % 14;
+    if (tap >= 3 || k >= 9) return false;     // 9 readings, then 5 empty
+    *x = taps[tap][0] + (k ? (k % 3) - 1 : 0);
+    *y = taps[tap][1] + (k ? (k % 2) : 35);
+    return true;
+}
 static void nosave(const game::Game&) {}
 
 int main(int argc, char** argv)
@@ -77,6 +91,7 @@ int main(int argc, char** argv)
     ui::UiHooks hooks{};
     hooks.random_seed = seed;
     hooks.save = nosave;
+    hooks.raw_touch = fake_touch;
     hooks.firmware_version = "preview";
     hooks.board_name = "Preview";
     ui::game_screen_create(g, hooks);
@@ -106,6 +121,11 @@ int main(int argc, char** argv)
     shot(out + "_4_menu.ppm");
     ui::game_screen_open_settings();
     shot(out + "_5_settings.ppm");
+    ui::game_screen_open_touch_test();
+    for (fake_step = 0; fake_step < 3 * 14; ++fake_step) { fake_ms += 10; lv_timer_handler(); }
+    fake_step = -1;
+    for (int k = 0; k < 5; ++k) { fake_ms += 10; lv_timer_handler(); }
+    shot(out + "_6_touch_test.ppm");
     ui::game_screen_close_overlays();
     fake_ms += 100;
     lv_timer_handler();

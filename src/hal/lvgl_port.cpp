@@ -101,6 +101,16 @@ LGFX& lvgl_port_gfx() { return gfx; }
 
 void lvgl_port_set_brightness(uint8_t level) { gfx.setBrightness(level); }
 
+bool lvgl_port_raw_touch(int16_t* x, int16_t* y)
+{
+    gfx.waitDMA();
+    lgfx::touch_point_t tp;
+    if (!gfx.getTouch(&tp, 1)) return false;
+    *x = tp.x;
+    *y = tp.y;
+    return true;
+}
+
 lv_display_t* lvgl_port_init(uint8_t rotation)
 {
     gfx.init();
