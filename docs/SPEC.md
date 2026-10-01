@@ -28,6 +28,16 @@ display's SPI bus).
 - Graphics: LovyanGFX (hardware) + LVGL 9 (UI), wired together in `src/hal/lvgl_port.cpp`.
 
 ## 3. Core mechanics & UX
+
+**Status (v0.1.0-alpha.3):** all items below are implemented in a first
+pass. Layout is **portrait** for now (Tom's call: decide after seeing it on
+hardware). Difficulty is by clue count only (Easy ~38, Medium ~32,
+Hard ~28, Expert 24-26); grading by solving technique is planned.
+
+Layout, top to bottom: status line (difficulty + clock; only where there's
+room, i.e. 320x480), board, tool row (Undo, Erase, Notes, Brush, Menu),
+digit row 1-9 (with "remaining" counts where there's room).
+
 - **Dual input modes**
   - *Cell-first:* select a cell, then tap a digit in the 1–9 bank.
   - *Digit-first (brush):* select a digit, then tap cells to place it.

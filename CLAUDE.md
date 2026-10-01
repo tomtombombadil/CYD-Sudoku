@@ -32,6 +32,16 @@
   never hard-coded 320x240.
 - Resistive-touch UX: big targets, no swipes/gestures.
 
+## Code layout and checks
+- `src/game/` sudoku core + rules: plain C++, no Arduino/LVGL. Tested on the
+  PC by `tools/host_tests/` (CI runs them with sanitizers before building).
+- `src/ui/` LVGL screens; hardware actions go through `UiHooks`, so the UI
+  also builds in `tools/preview/` (Linux-only helper Claude uses to render
+  screenshots at 240x320 and 320x480 before shipping UI changes).
+- `src/app/save_store.*` saves the game to LittleFS (`/game.bin`, written
+  via temp file + rename).
+- Layout is portrait for now; Tom will decide after seeing it on hardware.
+
 ## Known hardware issues
 - Tom's boards: 2.8" ESP32-2432S028 in both ILI9341 and ST7789 versions
   (src/boards/esp32_2432s028.hpp), and "ESP32-32E" display boards 3.2"

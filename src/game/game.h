@@ -1,0 +1,77 @@
+// Game state and rules on top of the sudoku core.
+// No LVGL/Arduino here either, so the rules can be tested on a PC.
+#pragma once
+
+#include <cstddef>
+#include <cstdint>
+#include "sudoku.h"
+
+namespace game {
+
+using sudoku::Difficulty;
+using sudoku::N;
+
+// One cell's previous state, recorded before every change. All changes made
+// by one player action share a `group`, and undo restores a whole group, so
+// undoing a placement also brings back the notes it auto-cleared.
+struct Change {
+    uint8_t  idx;
+    uint8_t  value;
+    uint16_t notes;
+    uint16_t group;
+};
+
+class Game {
+public:
+    static constexpr int kUndoCap = 600;
+
+    void start(Difficulty d, sudoku::Rng& rng);
+    void restart();                       // clear all entries, keep the puzzle
+
+    // ---- Queries -----------------------------------------------------------
+    bool        active() const        { return active_; }
+    Difficulty  difficulty() const    { return diff_; }
+    uint8_t     value(int i) const    { return value_[i]; }
+    bool        given(int i) const    { return puzzle_.c[i] != 0; }
+    uint16_t    notes(int i) const    { return notes_[i]; }   // bit d = note d
+    bool        has_note(int i, int d) const { return notes_[i] & (1u << d); }
+    // Value clashes with the same digit in its row, column or box.
+    bool        conflict(int i) const;
+    // How many of digit d are placed correctly (9 = digit finished).
+    int         placed_correct(int d) const;
+    bool        solved() const;
+    bool        can_undo() const      { return undo_n_ > 0; }
+    uint32_t    elapsed_s() const     { return elapsed_s_; }
+    void        add_second()          { if (active_ && !solved()) ++elapsed_s_; }
+
+    // ---- Player actions (return true if the board changed) -----------------
+    // Value mode: put d in the cell, or clear it if it already holds d.
+    //             Removes d from notes in the cell's row, column and box.
+    // Notes mode: toggle note d (only on empty cells).
+    bool enter(int i, int d, bool notes_mode);
+    bool erase(int i);                    // clear value and notes
+    bool undo();
+
+    // ---- Persistence ---------------------------------------------------------
+    // Serialized form is a flat byte image; see save layout in game.cpp.
+    size_t serialize(uint8_t* buf, size_t cap) const;
+    bool   deserialize(const uint8_t* buf, size_t len);
+    static size_t max_serialized_size();
+
+private:
+    void record(int i);                   // push cell i's current state
+    void begin_action()                   { ++group_; }
+
+    bool          active_ = false;
+    Difficulty    diff_   = Difficulty::Easy;
+    sudoku::Grid  puzzle_{};
+    sudoku::Grid  solution_{};
+    uint8_t       value_[N]{};
+    uint16_t      notes_[N]{};
+    uint32_t      elapsed_s_ = 0;
+    Change        undo_[kUndoCap];
+    uint16_t      undo_n_ = 0;
+    uint16_t      group_  = 0;
+};
+
+} // namespace game

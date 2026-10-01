@@ -2,9 +2,21 @@
 
 A polished, touch-friendly Sudoku for the ESP32 "Cheap Yellow Display" family.
 
-> **Status:** hardware bring-up. The firmware currently boots to a test screen
-> (display, color order, touch calibration, LVGL). The game comes next — see
-> [docs/SPEC.md](docs/SPEC.md).
+> **Status:** first playable alpha (portrait layout). Puzzles are generated on
+> the device; see [docs/SPEC.md](docs/SPEC.md) for what's done and planned.
+
+## How to play
+
+- **Tap a cell, then a digit** to fill it. Tap the same digit again to clear it.
+- **Brush:** turn it on, pick a digit, then tap cells to place that digit
+  quickly. Erase becomes an eraser brush while Brush is on.
+- **Notes:** turn it on to add or remove pencil marks instead of answers.
+  Placing a digit removes it from the notes in the same row, column and box.
+- **Undo** steps back one action at a time.
+- A digit button greys out once all nine of that digit are placed correctly.
+- Clashing digits are tinted red.
+- **Menu:** new game (Easy, Medium, Hard, Expert), restart, and the display
+  and touch settings. The game saves itself and picks up where you left off.
 
 ## Install
 
@@ -31,9 +43,8 @@ Confirmed working: 2.8" ST7789, 3.2" ST7789, 4.0" ST7796. The 2.8" ILI9341
 and 3.5" ST7796 builds haven't been tested on hardware yet. NM-CYD-C5
 (ESP32-C5) support is planned.
 
-Not sure which 2.8" you have? Try ILI9341 first. Wrong colors: use the
-**Invert** / **Swap R/B** buttons. Garbled or blank screen: install the
-other 2.8" version.
+Not sure which 2.8" you have? Try ILI9341 first. Wrong colors: see below.
+Garbled or blank screen: install the other 2.8" version.
 
 ## Building (Windows, VS Code + PlatformIO)
 
@@ -48,14 +59,14 @@ other 2.8" version.
 
 On first boot (or when the **BOOT** button is held while powering on), the
 screen shows corner arrows — tap each tip precisely. The calibration is saved
-to flash and reused. The test screen also has a **Recalibrate touch** button.
+to flash and reused. To redo it: **Menu → Display & touch → Recalibrate touch**.
 
 ## Colors look wrong?
 
-Panels vary between production runs. On the test screen, tap **Invert** if
-the background is light or colors look like a photo negative, and
-**Swap R/B** if the red and blue bars are swapped. The fix is saved on the
-board.
+Panels vary between production runs. Open **Menu → Display & touch**: use
+**Invert colors** if the background is dark or colors look like a photo
+negative, and **Swap red and blue** if the blue digits show as red. The fix
+is saved on the board.
 
 ## License
 

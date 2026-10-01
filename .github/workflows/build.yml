@@ -52,8 +52,20 @@ jobs:
             echo "version=dev-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
           fi
 
+  # Puzzle generator and game rules, compiled and run on the CI machine
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generator and rules tests
+        run: |
+          g++ -std=c++17 -O1 -Wall -Werror -fsanitize=address,undefined -o test_sudoku tools/host_tests/test_sudoku.cpp src/game/sudoku.cpp
+          g++ -std=c++17 -O1 -Wall -Werror -fsanitize=address,undefined -o test_game tools/host_tests/test_game.cpp src/game/game.cpp src/game/sudoku.cpp
+          ./test_sudoku
+          ./test_game
+
   build:
-    needs: boards
+    needs: [boards, tests]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false

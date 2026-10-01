@@ -36,10 +36,15 @@
 #define LV_LOG_PRINTF 0                   /* routed through lv_log_register_print_cb in lvgl_port.cpp */
 
 /* ---- Fonts --------------------------------------------------------------- */
-/* 14: small labels / pencil marks on large screens
- * 20: buttons and menus
- * 28: given/placed digits on 2.8"-3.2" screens
- * Sudoku-specific sizes for 3.5"/4.0" boards will be added with the game UI. */
+/*  8: pencil marks on 240-px-wide screens
+ * 10: pencil marks on 320-px-wide screens
+ * 12: "remaining" counts on digit keys (large screens)
+ * 14: small labels, tool buttons on small screens
+ * 20: digits on small screens, buttons and menus
+ * 28: digits on large screens, titles */
+#define LV_FONT_MONTSERRAT_8  1
+#define LV_FONT_MONTSERRAT_10 1
+#define LV_FONT_MONTSERRAT_12 1
 #define LV_FONT_MONTSERRAT_14 1
 #define LV_FONT_MONTSERRAT_20 1
 #define LV_FONT_MONTSERRAT_28 1
