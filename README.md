@@ -2,8 +2,8 @@
 
 A polished, touch-friendly Sudoku for the ESP32 "Cheap Yellow Display" family.
 
-> **Status:** feature-complete beta, heading for v1.0. Puzzles are generated
-> and graded on the device; see [docs/SPEC.md](docs/SPEC.md) for details.
+> **Status:** v1.0. Puzzles are generated and graded on the device; see
+> [docs/SPEC.md](docs/SPEC.md) for details.
 
 ## How to play
 

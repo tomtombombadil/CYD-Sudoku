@@ -43,8 +43,8 @@ Decided for v1.0 (Tom, 2026-10-01):
       flasher and in the README.
 - Out of scope for v1.0: SD on the 2.8" boards, NM-CYD-C5.
 
-Remaining: Tom's hardware test of this build, then he says when to cut
-v1.0.0.
+Released as **v1.0.0** on 2026-10-01 after Tom's test on the 3.2" board.
+Hint stays two taps (point, then fill) - Tom's call.
 
 ## 3. Core mechanics & UX
 

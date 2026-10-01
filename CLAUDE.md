@@ -118,7 +118,8 @@ only. Update `THIRD_PARTY_NOTICES.md` whenever code is brought in.
   `custom_firmware_name`, and redeploys the web flasher (GitHub Pages,
   https://tomtombombadil.github.io/CYD-Sudoku/) with that build (version
   `dev-<sha>`). This is how Tom gets builds for testing - keep it that way.
-- Don't publish a release unless Tom asks for one.
+- Don't publish a release unless Tom asks for one. v1.0.0 is out
+  (2026-10-01); later releases follow semver from there.
 - Releases: Actions tab -> Build -> "Run workflow" on main with
   `release_tag` = `vX.Y.Z` (hyphen = pre-release). The workflow creates the
   tag and a GitHub release with the `.bin` files (merged factory images,
