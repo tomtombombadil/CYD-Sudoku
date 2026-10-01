@@ -132,7 +132,8 @@ jobs:
             Or download the `.bin` for your board and flash it at address **0x0**.
             Files are named by screen size, display driver and touch type.
 
-  # Web flasher on GitHub Pages: always the newest build from main or a tag.
+  # Web flasher on GitHub Pages: every push to main and every release.
+  # Tom tests new builds by flashing them from here (his choice).
   pages:
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     needs: [boards, build]

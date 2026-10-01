@@ -23,6 +23,8 @@ struct UiHooks {
     void (*record_stat)(const stats::Record&);
     bool (*load_stats)(stats::Summary&);
     const char* (*stats_location)();
+    bool (*delete_last_stat)();
+    bool (*clear_stats)();
     const char* firmware_version;
     const char* board_name;
 };
@@ -42,6 +44,7 @@ void game_screen_tap_digit(int d);
 void game_screen_set_notes(bool on);
 void game_screen_set_input_mode(InputMode m);
 void game_screen_open_menu();
+void game_screen_menu_tap_new_game(int difficulty);
 void game_screen_open_settings();
 void game_screen_open_stats();
 void game_screen_hint();

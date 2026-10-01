@@ -11,5 +11,9 @@
 void        stats_store_record(const stats::Record& r);
 // Fills `out` from the whole saved history. False if nothing could be read.
 bool        stats_store_load(stats::Summary& out);
+// Remove the most recent record (e.g. a game recorded by mistake).
+bool        stats_store_delete_last();
+// Remove all records (card and board memory).
+bool        stats_store_clear();
 // Where the last load/record went: "SD card" or "board memory".
 const char* stats_store_location();

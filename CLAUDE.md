@@ -95,10 +95,11 @@ their headers. GPL projects (QQwing, OpenSudoku, LibreSudoku) are reference
 only. Update `THIRD_PARTY_NOTICES.md` whenever code is brought in.
 
 ## Releases and web flasher
-- Every push to main: CI builds every env that has `custom_firmware_name`
-  and redeploys the web flasher (GitHub Pages,
-  https://tomtombombadil.github.io/CYD-Sudoku/) with that build
-  (version `dev-<sha>`).
+- Every push to main: CI runs the tests, builds every env that has
+  `custom_firmware_name`, and redeploys the web flasher (GitHub Pages,
+  https://tomtombombadil.github.io/CYD-Sudoku/) with that build (version
+  `dev-<sha>`). This is how Tom gets builds for testing - keep it that way.
+- Don't publish a release unless Tom asks for one.
 - Releases: Actions tab -> Build -> "Run workflow" on main with
   `release_tag` = `vX.Y.Z` (hyphen = pre-release). The workflow creates the
   tag and a GitHub release with the `.bin` files (merged factory images,

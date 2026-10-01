@@ -114,6 +114,8 @@ int main(int argc, char** argv)
     hooks.raw_touch = fake_touch;
     hooks.load_stats = fake_stats;
     hooks.stats_location = fake_location;
+    hooks.delete_last_stat = [] { return true; };
+    hooks.clear_stats = [] { return true; };
     hooks.firmware_version = "preview";
     hooks.board_name = "Preview";
     ui::UiSettings settings;
@@ -154,6 +156,10 @@ int main(int argc, char** argv)
 
         ui::game_screen_open_menu();
         shot(pre + "_5_menu.ppm");
+        if (t == 0) {                                // first tap on Easy: asks to confirm
+            ui::game_screen_menu_tap_new_game(0);
+            shot(pre + "_5b_menu_confirm.ppm");
+        }
         ui::game_screen_open_stats();
         shot(pre + "_6_stats.ppm");
         ui::game_screen_open_settings();

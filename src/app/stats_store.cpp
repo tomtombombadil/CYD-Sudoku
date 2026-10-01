@@ -97,24 +97,42 @@ fs::FS* target(const char** path)
     return &LittleFS;
 }
 
-// Keep the flash file small: rewrite it with only the newest records.
-void trim_flash(uint32_t total)
+// Replace `path` with `tmp`. Some file systems refuse to rename over an
+// existing file, so fall back to remove + rename.
+bool replace_file(fs::FS& fs, const char* tmp, const char* path)
 {
-    if (total <= kFlashLimit) return;
-    const char* tmp = "/stats.tmp";
-    File out = LittleFS.open(tmp, "w");
-    if (!out) return;
+    if (fs.rename(tmp, path)) return true;
+    fs.remove(path);
+    return fs.rename(tmp, path);
+}
+
+// Rewrite the file keeping records number `first`..`last` (1-based,
+// inclusive), renumbered from 1. Empty range = header only.
+bool rewrite_range(fs::FS& fs, const char* path, uint32_t first, uint32_t last)
+{
+    char tmp[48];
+    snprintf(tmp, sizeof tmp, "%s.tmp", path);
+    File out = fs.open(tmp, "w");
+    if (!out) return false;
     out.print(stats::kCsvHeader);
     uint32_t seen = 0, kept = 0;
     char line_out[96];
     stats::Record r;
-    for_each_line(LittleFS, kFlashPath, [&](const char* l) {
+    for_each_line(fs, path, [&](const char* l) {
         if (!stats::parse_line(l, r)) return;
-        if (++seen > total - kFlashKeep && stats::format_line(line_out, sizeof line_out, ++kept, r))
+        ++seen;
+        if (seen >= first && seen <= last && stats::format_line(line_out, sizeof line_out, ++kept, r))
             out.print(line_out);
     });
     out.close();
-    LittleFS.rename(tmp, kFlashPath);
+    return replace_file(fs, tmp, path);
+}
+
+// Keep the flash file small: rewrite it with only the newest records.
+void trim_flash(uint32_t total)
+{
+    if (total <= kFlashLimit) return;
+    rewrite_range(LittleFS, kFlashPath, total - kFlashKeep + 1, total);
 }
 
 } // namespace
@@ -147,6 +165,27 @@ bool stats_store_load(stats::Summary& out)
     if (!fs) return false;
     stats::Record r;
     return for_each_line(*fs, path, [&](const char* l) { if (stats::parse_line(l, r)) out.add(r); });
+}
+
+bool stats_store_delete_last()
+{
+    const char* path = nullptr;
+    fs::FS* fs = target(&path);
+    if (!fs) return false;
+    const uint32_t n = count_records(*fs, path);
+    if (n == 0) return false;
+    return rewrite_range(*fs, path, 1, n - 1);
+}
+
+bool stats_store_clear()
+{
+    bool ok = true;
+    if (sd_begin()) {
+        fs::FS& sd = sd_fs();
+        if (sd.exists(kSdPath)) ok = sd.remove(kSdPath) && ok;
+    }
+    if (storage_begin() && LittleFS.exists(kFlashPath)) ok = LittleFS.remove(kFlashPath) && ok;
+    return ok;
 }
 
 const char* stats_store_location() { return on_sd ? "SD card" : "board memory"; }

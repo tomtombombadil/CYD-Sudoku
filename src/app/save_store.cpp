@@ -36,5 +36,10 @@ void save_store_save(const game::Game& g)
     const size_t w = f.write(buf, n);
     f.close();
     if (w != n) { LittleFS.remove(kTmp); return; }
-    LittleFS.rename(kTmp, kPath);   // LittleFS rename replaces atomically
+    // LittleFS renames over an existing file atomically; if this build's
+    // VFS refuses, fall back to remove + rename.
+    if (!LittleFS.rename(kTmp, kPath)) {
+        LittleFS.remove(kPath);
+        LittleFS.rename(kTmp, kPath);
+    }
 }

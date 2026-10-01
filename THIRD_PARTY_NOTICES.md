@@ -1,37 +1,50 @@
 # Third-party components and sources
 
-CYD Sudoku is MIT licensed. Everything it builds on, or plans to borrow from,
-is listed here with its license. **Rule: only MIT, BSD, Apache-2.0, zlib or
-public-domain code may be copied into this repository.** GPL projects can be
-studied for UX ideas but no code from them may be copied.
+CYD Sudoku is MIT licensed. Everything it builds on is listed here with its
+license. **Rule: only MIT, BSD, Apache-2.0, zlib or public-domain code may be
+copied into this repository.** GPL projects can be studied for UX ideas but
+no code from them may be copied.
 
-## Libraries (linked, pulled in by PlatformIO)
+## In the firmware
 
 | Component | Use | License |
 |---|---|---|
 | [LovyanGFX](https://github.com/lovyan03/LovyanGFX) | Display, touch, backlight drivers | MIT and BSD-2-Clause |
 | [LVGL](https://github.com/lvgl/lvgl) 9.x | UI widgets and rendering | MIT |
+| Montserrat font (bundled with LVGL) | All on-screen text | SIL Open Font License 1.1 |
 | [Arduino-ESP32](https://github.com/espressif/arduino-esp32) via [pioarduino](https://github.com/pioarduino/platform-espressif32) | Framework / core | LGPL-2.1 (core), Apache-2.0 (ESP-IDF) |
 
 The Arduino core is LGPL-2.1. Because this project's full source is public,
 anyone can rebuild the firmware against a modified core, which satisfies the
 LGPL for the binaries published in Releases.
 
-## Reference material
+## On the web flasher page (loaded from CDNs, not copied into the repo)
 
-| Source | What we take | License |
+| Component | Use | License |
 |---|---|---|
-| [witnessmenow/ESP32-Cheap-Yellow-Display](https://github.com/witnessmenow/ESP32-Cheap-Yellow-Display) | Pinouts, panel settings | MIT |
+| [ESP Web Tools](https://github.com/esphome/esp-web-tools) | Browser flashing | Apache-2.0 |
+| [Barlow / Barlow Condensed](https://fonts.google.com/specimen/Barlow) (Google Fonts) | Page typography | SIL Open Font License 1.1 |
 
-## Planned Sudoku sources (not yet copied in)
+## Reference material (no code copied)
 
-| Source | Planned use | License | OK to copy code? |
+| Source | What we took | License |
+|---|---|---|
+| [witnessmenow/ESP32-Cheap-Yellow-Display](https://github.com/witnessmenow/ESP32-Cheap-Yellow-Display) | 2.8" pinouts, panel settings | MIT |
+| lcdwiki.com datasheets for the ESP32-32E display boards | 3.2"/3.5"/4.0" pinouts | Documentation |
+
+## Sudoku code
+
+The solver, generator and game rules in `src/game/` were written for this
+project; no Sudoku code was copied in. These were considered and remain
+options for later:
+
+| Source | Possible use | License | OK to copy code? |
 |---|---|---|---|
-| Simon Tatham's Portable Puzzle Collection — `solo.c` | Generator + difficulty grading by human solving techniques | MIT | Yes |
-| [t-dillon/tdoku](https://github.com/t-dillon/tdoku) | Fast solver / uniqueness checks; algorithm notes | BSD-2-Clause | Yes (keep notice) |
-| [grantm/sudoku-exchange-puzzle-bank](https://github.com/grantm/sudoku-exchange-puzzle-bank) | Fallback puzzle packs on LittleFS (easy / medium / hard / diabolical) | Public domain (Unlicense-style) | Yes |
+| Simon Tatham's Portable Puzzle Collection — `solo.c` | Difficulty grading by human solving techniques | MIT | Yes |
+| [t-dillon/tdoku](https://github.com/t-dillon/tdoku) | Faster solver | BSD-2-Clause | Yes (keep notice) |
+| [grantm/sudoku-exchange-puzzle-bank](https://github.com/grantm/sudoku-exchange-puzzle-bank) | Pre-rated puzzle packs on LittleFS | Public domain (Unlicense-style) | Yes |
 | [stephenostermiller/qqwing](https://github.com/stephenostermiller/qqwing) | — | GPL-2.0 | **No** — reference only |
 | OpenSudoku, [LibreSudoku](https://github.com/kaajjo/LibreSudoku) (Android) | UX ideas only | GPL-3.0 | **No** — reference only |
 
 When code is copied in, keep its original copyright header in the file and
-move its row to a "Included code" section here.
+move its row to the "In the firmware" table.

@@ -38,6 +38,8 @@ int  brush_digit  = 0;               // Digit 1st mode: the digit being placed
 int  hint_cell    = -1;              // cell the last Hint tap pointed at
 bool solved_seen  = false;           // solve already celebrated + recorded
 bool idle_paused  = false;           // clock stopped: no touches for a while
+int  menu_armed   = -1;              // menu confirm: -1 none, 0..3 new game level, 10 restart
+constexpr int kArmRestart = 10;
 
 // The clock stops after this long with no touch, so time the board sits on
 // unattended doesn't count. The next touch starts it again.
@@ -295,7 +297,7 @@ void digit_cb(lv_event_t* e) { on_digit(static_cast<int>(reinterpret_cast<intptr
 void tool_cb(lv_event_t* e)
 {
     const intptr_t id = reinterpret_cast<intptr_t>(lv_event_get_user_data(e));
-    if (id == 4) { game_screen_open_menu(); return; }
+    if (id == 4) { menu_armed = -1; game_screen_open_menu(); return; }
     if (finished()) return;
     if (id != 3) hint_cell = -1;
     switch (id) {
@@ -363,10 +365,30 @@ lv_obj_t* overlay_bottom_button(const char* text, lv_event_cb_t cb, intptr_t use
     return b;
 }
 
+// A game counts as in progress once it's been played (moves or 30 s).
+// Leaving one needs a second tap: the first relabels the button "Tap again".
+
+bool game_in_progress()
+{
+    return G->active() && !G->solved() && (G->can_undo() || G->elapsed_s() >= 30);
+}
+
+// True if the action should go ahead now; otherwise arms it and redraws.
+bool confirm_leave(int which)
+{
+    if (!game_in_progress() || menu_armed == which) {
+        menu_armed = -1;
+        return true;
+    }
+    menu_armed = which;
+    game_screen_open_menu();
+    return false;
+}
+
 void start_new(sudoku::Difficulty d)
 {
     // Leaving an unfinished puzzle that was actually played counts as giving up
-    if (H.record_stat && G->active() && !G->solved() && (G->can_undo() || G->elapsed_s() >= 30)) {
+    if (H.record_stat && game_in_progress()) {
         stats::Record r;
         r.difficulty = static_cast<uint8_t>(G->difficulty());
         r.result = stats::Result::GaveUp;
@@ -387,6 +409,7 @@ void start_new(sudoku::Difficulty d)
     selected = -1;
     brush_digit = 0;
     hint_cell = -1;
+    notes_mode = false;
     solved_seen = false;
     game_screen_close_overlays();
     if (H.save) H.save(*G);
@@ -397,23 +420,26 @@ void start_new(sudoku::Difficulty d)
 
 void new_game_cb(lv_event_t* e)
 {
-    start_new(static_cast<sudoku::Difficulty>(reinterpret_cast<intptr_t>(lv_event_get_user_data(e))));
+    const int d = static_cast<int>(reinterpret_cast<intptr_t>(lv_event_get_user_data(e)));
+    if (confirm_leave(d)) start_new(static_cast<sudoku::Difficulty>(d));
 }
 
 void menu_cb(lv_event_t* e)
 {
     switch (reinterpret_cast<intptr_t>(lv_event_get_user_data(e))) {
         case 0:  // restart puzzle
+            if (!confirm_leave(kArmRestart)) return;
             G->restart();
             selected = -1;
             hint_cell = -1;
+            notes_mode = false;
             solved_seen = false;
             game_screen_close_overlays();
             changed();
             update();
             break;
-        case 1: game_screen_open_settings(); break;
-        case 2: game_screen_close_overlays(); update(); break;
+        case 1: menu_armed = -1; game_screen_open_settings(); break;
+        case 2: menu_armed = -1; game_screen_close_overlays(); update(); break;
         case 3: game_screen_open_menu(); break;                // back to the menu
         case 4: if (H.toggle_invert) H.toggle_invert(); break;
         case 5: if (H.toggle_swap_rb) H.toggle_swap_rb(); break;
@@ -427,7 +453,7 @@ void menu_cb(lv_event_t* e)
             save_settings();
             game_screen_open_settings();
             break;
-        case 9: game_screen_open_stats(); break;
+        case 9: menu_armed = -1; game_screen_open_stats(); break;
     }
 }
 
@@ -481,6 +507,23 @@ void stats_table_show(const StatsTable& t, const char* const head[4],
 }
 
 void stats_back_cb(lv_event_t*) { game_screen_open_menu(); }
+
+// Delete last / Clear all: first tap arms the button ("Tap again"), the
+// second does it. Arming one disarms the other.
+int stats_armed = 0;                 // 0 none, 1 delete last, 2 clear all
+
+void stats_action_cb(lv_event_t* e)
+{
+    const int which = static_cast<int>(reinterpret_cast<intptr_t>(lv_event_get_user_data(e)));
+    if (stats_armed != which) {
+        stats_armed = which;
+    } else {
+        stats_armed = 0;
+        if (which == 1 && H.delete_last_stat) H.delete_last_stat();
+        if (which == 2 && H.clear_stats) H.clear_stats();
+    }
+    game_screen_open_stats();        // redraw with new labels / data
+}
 
 } // namespace
 
@@ -744,7 +787,9 @@ void game_screen_tick(uint32_t now_ms)
         idle_paused = idle;
         update_status();
     }
-    if (last_sec_ms == 0) last_sec_ms = now_ms;
+    // If the loop was blocked (puzzle generation, SD writes), don't bill the
+    // player for that time: drop the backlog instead of catching up.
+    if (last_sec_ms == 0 || now_ms - last_sec_ms > 3000) last_sec_ms = now_ms;
     if (now_ms - last_sec_ms >= 1000) {
         last_sec_ms += 1000;
         if (!overlay && !idle_paused && G->active() && !G->solved()) {
@@ -765,6 +810,10 @@ void game_screen_tick(uint32_t now_ms)
 void game_screen_tap_cell(int idx)            { on_cell(idx); }
 void game_screen_tap_digit(int d)             { on_digit(d); }
 void game_screen_set_notes(bool on)           { notes_mode = on; update(); }
+void game_screen_menu_tap_new_game(int d)
+{
+    if (confirm_leave(d)) start_new(static_cast<sudoku::Difficulty>(d));
+}
 void game_screen_hint()                       { on_hint(); }
 void game_screen_set_input_mode(InputMode m)
 {
@@ -774,8 +823,10 @@ void game_screen_set_input_mode(InputMode m)
 
 void game_screen_open_menu()
 {
+    stats_armed = 0;
     overlay_begin("CYD Sudoku");
-    overlay_text("Start a new game:", false);
+    overlay_text(menu_armed >= 0 ? "Tap again to leave the current game." : "Start a new game:",
+                 menu_armed >= 0);
 
     lv_obj_t* grid = lv_obj_create(overlay);
     lv_obj_remove_style_all(grid);
@@ -787,12 +838,17 @@ void game_screen_open_menu()
     const int half = (scr_w - 2 * (large ? 16 : 10) - 6) / 2;
     for (int d = 0; d < 4; ++d) {
         lv_obj_t* b = make_key(grid, half, menu_btn_h(), new_game_cb, d);
-        key_label(b, sudoku::difficulty_name(static_cast<sudoku::Difficulty>(d)), menu_font());
+        if (menu_armed == d) lv_obj_add_state(b, LV_STATE_CHECKED);
+        key_label(b, menu_armed == d ? "Tap again"
+                                     : sudoku::difficulty_name(static_cast<sudoku::Difficulty>(d)),
+                  menu_font());
     }
-    overlay_button(overlay, "Restart this puzzle", menu_cb, 0);
+    lv_obj_t* r = overlay_button(overlay, menu_armed == kArmRestart ? "Tap again to restart"
+                                                                    : "Restart this puzzle", menu_cb, 0);
+    if (menu_armed == kArmRestart) lv_obj_add_state(r, LV_STATE_CHECKED);
     if (H.load_stats) overlay_button(overlay, "Stats", menu_cb, 9);
     overlay_button(overlay, "Display & touch", menu_cb, 1);
-    overlay_button(overlay, "Back to game", menu_cb, 2, true);
+    overlay_button(overlay, "Back to game", menu_cb, 2, menu_armed < 0);
 }
 
 void game_screen_open_settings()
@@ -840,7 +896,7 @@ void game_screen_open_stats()
         const char* const head1[4] = {"Level", "Solved", large ? "Average" : "Avg", "Best"};
         stats_table_show(levels, head1, rf, tf);
 
-        const int max_rows = large ? 7 : 5;
+        const int max_rows = large ? 6 : 4;   // leaves room for the action buttons
         const int show = sum.recent_n < max_rows ? sum.recent_n : max_rows;
         for (int i = 0; i < show; ++i) {
             const stats::Record& r = sum.newest(i);
@@ -857,7 +913,31 @@ void game_screen_open_stats()
     snprintf(where, sizeof where, "Saved on the %s.",
              H.stats_location ? H.stats_location() : "board");
     overlay_text(where, true);
-    overlay_bottom_button("Back", stats_back_cb, 0);
+
+    // Bottom: [Delete last | Clear all] above Back
+    const int bh = menu_btn_h(), gap = large ? 10 : 6;
+    lv_obj_t* back = overlay_bottom_button("Back", stats_back_cb, 0);
+    if (ok && sum.total > 0 && H.delete_last_stat && H.clear_stats) {
+        lv_obj_t* row = lv_obj_create(overlay);
+        lv_obj_remove_style_all(row);
+        lv_obj_set_size(row, lv_pct(100), bh);
+        lv_obj_set_ignore_layout(row, true);
+        lv_obj_align_to(row, back, LV_ALIGN_OUT_TOP_MID, 0, -gap);
+        lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
+        lv_obj_set_style_pad_column(row, 6, 0);
+        lv_obj_set_clickable(row, false);
+        lv_obj_set_scrollable(row, false);
+        const char* labels[2] = {stats_armed == 1 ? "Tap again" : "Delete last",
+                                 stats_armed == 2 ? "Tap again" : "Clear all"};
+        for (int k = 0; k < 2; ++k) {
+            lv_obj_t* b = make_key(row, 10, bh, stats_action_cb, k + 1);
+            lv_obj_set_flex_grow(b, 1);
+            if (stats_armed == k + 1) lv_obj_add_state(b, LV_STATE_CHECKED);
+            key_label(b, labels[k], menu_font());
+        }
+    } else {
+        stats_armed = 0;
+    }
 }
 
 void game_screen_open_touch_test()

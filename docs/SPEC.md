@@ -27,6 +27,23 @@ display's SPI bus).
 - VS Code + PlatformIO (Windows), C++17, Arduino framework (Arduino-ESP32 3.x via pioarduino).
 - Graphics: LovyanGFX (hardware) + LVGL 9 (UI), wired together in `src/hal/lvgl_port.cpp`.
 
+## v1.0 checklist (as of 2026-10-01 code review)
+
+Built and working: everything in sections 3 and 5, stats, hints, themes,
+idle-paused clock, web flasher, five board builds.
+
+Open before v1.0 (Tom to decide which are in scope):
+- [ ] Section 4 fallback: puzzle packs on LittleFS (not built; on-device
+      generation has been reliable, so this may be dropped or replaced by
+      technique-based difficulty grading).
+- [ ] Difficulty graded only by clue count; no solving-technique grading.
+- [ ] Highlighting: in Digit 1st with a digit picked, tapping a placed digit
+      doesn't switch the highlight to that digit.
+- [ ] Portrait vs landscape decision (Tom).
+- [ ] Hardware test of the 2.8" ILI9341 and 3.5" ST7796 builds.
+- [ ] SD card on the 2.8" boards (needs a bit-banged touch driver).
+- [ ] NM-CYD-C5 board (stretch goal).
+
 ## 3. Core mechanics & UX
 
 **Status (v0.1.0-alpha.7):** first pass of everything below is in.
@@ -58,6 +75,9 @@ Decisions from Tom's testing:
 - (alpha.7) Clock pauses after 2 minutes without a touch (top bar shows
   "Paused"); it also stops while the menu is open. Off time can't be counted
   (no RTC battery); unattended powered-on time was the stats problem.
+- (post alpha.8) Stats screen: "Delete last" and "Clear all", each needing a
+  second tap ("Tap again"). New game and Restart need a second tap while a
+  game is in progress (moves made or 30 s played).
 - (alpha.6) Stats: record Solved and Gave up (leaving a played puzzle for a
   new one) with difficulty, time, hints. CSV on SD where usable, else
   LittleFS. Stats screen: per-difficulty solved / average / best, and the

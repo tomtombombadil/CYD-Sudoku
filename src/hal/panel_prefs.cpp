@@ -23,6 +23,7 @@ bool base_rgb_order = false;   // board file's rgb_order, captured once
 
 void apply(LGFX& gfx)
 {
+    gfx.waitDMA();                 // never send commands mid screen transfer
     // Inversion: LovyanGFX XORs this with the board file's cfg.invert.
     gfx.invertDisplay(current.invert);
 

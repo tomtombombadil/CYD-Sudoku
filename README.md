@@ -39,15 +39,18 @@ the tool row (**Undo**, **Notes**, input mode, **Hint**); the digits 1-9.
   screen. Open the ☰ menu when you're ready for a new game.
 - **☰ menu:** new game (Easy, Medium, Hard, Expert), restart, **Stats**, and
   **Display & touch** (Light/Dark theme, panel color fixes, touch
-  calibration, touch test). The game saves itself and picks up where you
-  left off.
+  calibration, touch test). Starting a new game or restarting while a game
+  is in progress asks for a second tap. The game saves itself and picks up
+  where you left off.
 
 ## Stats
 
 Every solved puzzle is recorded with its difficulty, time and hints used. So
 is every puzzle you leave for a new game after playing it (marked "Gave up").
 The Stats screen shows solves, average and best time per difficulty, and
-your most recent games.
+your most recent games. **Delete last** removes the most recent entry (for a
+game recorded by mistake) and **Clear all** wipes the history; each needs a
+second tap to confirm.
 
 - **With a microSD card** (3.2", 3.5" and 4.0" boards): saved to
   `CYD-Sudoku/stats.csv` on the card, full history, opens in Excel.
