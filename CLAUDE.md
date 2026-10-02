@@ -38,6 +38,9 @@
 - `src/ui/` LVGL screens; hardware actions go through `UiHooks`, so the UI
   also builds in `tools/preview/` (Linux-only helper Claude uses to render
   screenshots at 240x320 and 320x480 before shipping UI changes).
+  README screenshots: `docs/screenshots/`, made from preview renders by
+  `tools/preview/readme_shots.py`. Re-render them when a shown screen
+  changes.
 - `src/app/save_store.*` saves the game to LittleFS (`/game.bin`, written
   via temp file + rename).
 - Layout is portrait - final (Tom: comfortable one-handed). Don't add

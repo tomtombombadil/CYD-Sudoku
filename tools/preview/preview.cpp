@@ -116,8 +116,9 @@ int main(int argc, char** argv)
     hooks.stats_location = fake_location;
     hooks.delete_last_stat = [] { return true; };
     hooks.clear_stats = [] { return true; };
-    hooks.firmware_version = "preview";
-    hooks.board_name = "Preview";
+    // Look like a real board so the README screenshots read naturally.
+    hooks.firmware_version = "v1.0.0";
+    hooks.board_name = W == 240 ? "3.2\" ST7789 Resistive" : "4.0\" ST7796 Resistive";
     ui::UiSettings settings;
     ui::game_screen_create(g, hooks, settings);
 

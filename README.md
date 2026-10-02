@@ -5,6 +5,28 @@ A polished, touch-friendly Sudoku for the ESP32 "Cheap Yellow Display" family.
 > **Status:** v1.0. Puzzles are generated and graded on the device; see
 > [docs/SPEC.md](docs/SPEC.md) for details.
 
+## Screenshots
+
+**2.8" and 3.2" boards (240×320)**: playing, Digit 1st with notes (dark
+theme), a hint pointing at a cell, a solved board.
+
+<p>
+<img src="docs/screenshots/small_game_light.png" width="240" alt="Game in progress, light theme">
+<img src="docs/screenshots/small_notes_dark.png" width="240" alt="Digit 1st mode with notes, dark theme">
+<img src="docs/screenshots/small_hint.png" width="240" alt="Hint pointing at a cell">
+<img src="docs/screenshots/small_solved.png" width="240" alt="Solved puzzle">
+</p>
+
+**3.5" and 4.0" boards (320×480)**: playing (with digits-left counts),
+the ☰ menu, stats, Display & touch (dark theme).
+
+<p>
+<img src="docs/screenshots/large_game_light.png" width="320" alt="Game in progress on a 320x480 board">
+<img src="docs/screenshots/large_menu.png" width="320" alt="Menu">
+<img src="docs/screenshots/large_stats.png" width="320" alt="Stats screen">
+<img src="docs/screenshots/large_settings_dark.png" width="320" alt="Display and touch settings, dark theme">
+</p>
+
 ## How to play
 
 The screen, top to bottom: clock, difficulty and the **☰ menu**; the board;
