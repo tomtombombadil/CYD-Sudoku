@@ -5,6 +5,10 @@ A polished, touch-friendly Sudoku for the ESP32 "Cheap Yellow Display" family.
 > **Status:** v1.0. Puzzles are generated and graded on the device; see
 > [docs/SPEC.md](docs/SPEC.md) for details.
 
+## WEB FLASHER!!!
+I know you just want to flash this to your CYD right now, so here's the web flasher:
+[CYD-Sudoku Web Flasher](https://tomtombombadil.github.io/CYD-Sudoku/)
+
 ## Screenshots
 
 **2.8" and 3.2" boards (240×320)**: playing, Digit 1st with notes (dark
