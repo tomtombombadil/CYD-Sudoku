@@ -10,6 +10,8 @@
 //   SD card (VSPI)  : SCK 18, MISO 19, MOSI 23, CS 5   (conflicts with touch's VSPI use)
 //   RGB LED (active low) : R 4, G 16, B 17
 //   LDR 34, speaker amp 26, BOOT button 0
+//   ILI9341 version only: the amp is enabled by GPIO 4 LOW (shared with the
+//   red LED); board_select.h defines BOARD_PIN_AUDIO_EN for that build.
 //
 // Do not include directly - include boards/board_select.h.
 #pragma once

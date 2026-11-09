@@ -91,6 +91,15 @@
   is also VSPI but on 18/19/23/5. LovyanGFX's XPT2046 driver has no software
   SPI, so SD on this board needs a bit-banged XPT2046 touch class or bus
   switching. LittleFS is used first for this reason.
+- Sound on the 2.8" ILI9341 (not the ST7789): its amplifier only runs
+  while GPIO 4 (also the red LED, active low) is LOW. board_select.h
+  defines BOARD_PIN_AUDIO_EN 4 in the ILI9341 branch only - never in the
+  shared esp32_2432s028.hpp; the ST7789's sound works without it (Tom).
+  Boot keeps it HIGH (off), after the LED setup. Any future sound must
+  switch the amp on early (~100 ms wake-up) and keep it on, or short
+  sounds are clipped. Red LED glows while it's on - expected. Source:
+  CYD-GoldBoxGameEngine v0.179.2; witnessmenow/ESP32-Cheap-Yellow-Display
+  issue #372.
 - ESP32-32E boards: touch shares the display's HSPI bus (CS 33); SD is on
   VSPI by itself, so SD works there (BOARD_SD_USABLE 1).
 - 2.8" SD (BOARD_SD_USABLE 0) needs a bit-banged XPT2046 touch driver first;

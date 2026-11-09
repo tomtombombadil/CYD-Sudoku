@@ -39,6 +39,9 @@ void quiet_peripherals()
     for (uint8_t p : leds) { pinMode(p, OUTPUT); digitalWrite(p, off); }
 #endif
 #ifdef BOARD_PIN_AUDIO_EN
+    // After the LEDs: on the 2.8" ILI9341 this is the red LED's pin too.
+    // To play sound, drive it LOW early (the amp needs ~100 ms to wake)
+    // and keep it low; the red LED then glows, which is harmless.
     pinMode(BOARD_PIN_AUDIO_EN, OUTPUT);
     digitalWrite(BOARD_PIN_AUDIO_EN, HIGH);   // high = amplifier off
 #endif

@@ -26,6 +26,9 @@
 
 // ---- 2.8" ESP32-2432S028 (the original CYD layout) ---------------------------
 #if defined(CYD_BOARD_28_ILI9341_RES)
+  // The ILI9341 board's amplifier waits for GPIO 4 low (the red LED's pin);
+  // the ST7789 board's doesn't - never in the shared header
+  #define BOARD_PIN_AUDIO_EN 4
   #include "esp32_2432s028.hpp"
   #define BOARD_NAME "2.8\" ILI9341 Resistive"  // not yet tested on hardware
   class LGFX : public LGFX_Esp32_2432S028<lgfx::Panel_ILI9341, false> {};
