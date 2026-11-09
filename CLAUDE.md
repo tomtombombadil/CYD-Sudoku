@@ -20,6 +20,15 @@
   `custom_board_title` and `custom_board_hint`. CI, releases and the web
   flasher all read those - platformio.ini is the single source of truth.
   Adding a board = new env with those three options + board_select.h entry.
+- Chip first when it isn't the plain ESP32, the maker's model in
+  parentheses at the end (Tom's rule from CYD-Classic-Games, 2026-10-16):
+  `ESP32-S3 4.0" ST7796 Capacitive (Freenove FNK0104S)` ->
+  `CYD_ESP32-S3_4.0in_ST7796_Capacitive.bin`. The flasher reads
+  `custom_chip_family` (env or the section it extends; default ESP32) for
+  the manifest's chipFamily.
+- Web flasher: one dropdown + one Install button (Tom, 2026-11-08), then a
+  "Which board do I have?" reference list whose rows pick in the dropdown.
+  `?board=<firmware name>` preselects; the last choice is remembered.
 
 ## Architecture
 - One PlatformIO env per board; each sets exactly one `CYD_BOARD_*` flag.
@@ -86,11 +95,14 @@
 
 ## Known hardware issues
 - Supported boards: 2.8" ESP32-2432S028 in ILI9341 and ST7789 versions
-  (src/boards/esp32_2432s028.hpp), and "ESP32-32E" display boards 3.2"
-  ST7789, 3.5" ST7796, 4.0" ST7796, all resistive. Tom owns the 2.8" ST7789,
-  3.2" and 4.0" only
-  (src/boards/esp32_32e_display.hpp). The ESP32-32E boards have no model
-  number on the PCB - only text like "3.2" LCD Display, ESP32-32E, 240x320,
+  (src/boards/esp32_2432s028.hpp), "ESP32-32E" display boards 3.2"
+  ST7789, 3.5" ST7796, 4.0" ST7796, all resistive
+  (src/boards/esp32_32e_display.hpp), the Freenove FNK0104S ESP32-S3 4.0"
+  (src/boards/freenove_s3_display.hpp) and the NM-CYD-C5
+  (src/boards/nm_cyd_c5.hpp). Tom owns and has tested the five classic
+  boards (the 2.8" ILI9341 and 3.5" via CYD-Classic-Games, same board
+  files). The S3 and C5 carry `custom_board_tested = no`.
+- The ESP32-32E boards have no model number on the PCB - only text like "3.2" LCD Display, ESP32-32E, 240x320,
   Resistive Touch". They are NOT ESP32-3248S0xx boards; never use that
   pinout for them. Their datasheets are on lcdwiki.com.
 - 2.8" ESP32-2432S028: touch (XPT2046) uses VSPI on pins 25/32/39/33; the SD card
@@ -109,11 +121,24 @@
 - ESP32-32E boards: touch shares the display's HSPI bus (CS 33); SD is on
   VSPI by itself, so SD works there (BOARD_SD_USABLE 1).
 - 2.8" SD (BOARD_SD_USABLE 0) needs a bit-banged XPT2046 touch driver first;
-  until then stats on the 2.8" go to LittleFS. Out of scope for v1.0, as is
-  NM-CYD-C5.
-- Tom has NO 2.8" ILI9341 or 3.5" ST7796 unit. Those envs carry
-  `custom_board_tested = no`, which the flasher and README show as
-  "untested". Remove it only when someone reports the board working.
+  until then stats on the 2.8" go to LittleFS.
+- `custom_board_tested = no` shows as "untested" on the flasher and README.
+  Remove it only when someone reports the board working.
+- ESP32-S3 boards (`[esp32_s3]`: 16 MB DIO flash, 8 MB octal PSRAM,
+  `partitions_16mb.csv` = 6 MB app + 2 MB LittleFS, native USB CDC with TX
+  timeout 0 so an unread port never stalls). Freenove FNK0104S: ST7796 on
+  SPI2 at 80 MHz, invert on, BGR; FT6336U capacitive touch (no calibration;
+  `BOARD_TOUCH_RESISTIVE 0` drops Recalibrate); SD on SDMMC 4-bit
+  (`BOARD_SD_MMC`); amp enable GPIO 1 kept HIGH (no sound). Same board file
+  as CYD-Classic-Games minus its ES8311 sound.
+- ESP32-C5 (`[esp32_c5]`: 16 MB flash, same partitions, single RISC-V core,
+  needs LovyanGFX >= 1.3.0). NM-CYD-C5 pins from RockBase's TFT_eSPI setup
+  and schematic (github.com/Yverr0y/NM-CYD-C5): one SPI bus (SCLK 6, MOSI
+  7, MISO 2) for display (CS 23, DC 24, BL 25), XPT2046 touch (CS 1, no IRQ)
+  and SD (CS 10); BOOT = GPIO 28; speaker in GPIO 26 (no amp enable);
+  WS2812 on 27. Inversion off, BGR. SD is off (BOARD_SD_USABLE 0) until
+  bus sharing with LovyanGFX is written and tested. Serial log via the
+  CH340 port (UART0).
 - Tom uses a Nintendo DS Lite stylus with firm presses - NOT a finger.
   Don't explain touch problems with finger size or light pressure.
 - 4.0" first-tap offset (first tap after idle landed ~1 cell low or right):

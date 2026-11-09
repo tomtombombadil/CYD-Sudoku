@@ -903,7 +903,9 @@ void game_screen_open_settings()
     // Full width each: "Swap red/blue" doesn't fit half a row at the menu font.
     overlay_pair("Invert colors", 4, nullptr, 0);
     overlay_pair("Swap red/blue", 5, nullptr, 0);
-    overlay_pair("Recalibrate", 6, H.raw_touch ? "Touch test" : nullptr, 7);
+    // Recalibrate only on resistive boards (capacitive touch needs none)
+    overlay_pair(H.recalibrate_touch ? "Recalibrate" : nullptr, 6,
+                 H.raw_touch ? "Touch test" : nullptr, 7);
     overlay_button(overlay, "Back", menu_cb, 3, true);
     char info[96];
     snprintf(info, sizeof info, "%s, firmware %s", H.board_name ? H.board_name : "",

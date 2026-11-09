@@ -3,7 +3,42 @@
 #include <Arduino.h>
 #include "boards/board_select.h"
 
-#if BOARD_SD_USABLE
+#if BOARD_SD_USABLE && defined(BOARD_SD_MMC)
+
+// SD slot on the SDMMC bus, 4 data lines (ESP32-S3 boards)
+#include <SD_MMC.h>
+
+namespace {
+bool mounted = false;
+bool pins_set = false;
+}
+
+bool sd_begin()
+{
+    if (mounted) return true;
+    if (!pins_set) {
+        pins_set = SD_MMC.setPins(BOARD_PIN_SD_CLK, BOARD_PIN_SD_CMD, BOARD_PIN_SD_D0,
+                                  BOARD_PIN_SD_D1, BOARD_PIN_SD_D2, BOARD_PIN_SD_D3);
+        if (!pins_set) return false;
+    }
+    mounted = SD_MMC.begin("/sdcard", false);   // false = 4-bit
+    if (mounted) {
+        Serial.printf("[sd] card mounted, %llu MB\n", (unsigned long long)(SD_MMC.cardSize() >> 20));
+    }
+    return mounted;
+}
+
+fs::FS& sd_fs() { return SD_MMC; }
+
+void sd_lost()
+{
+    if (!mounted) return;
+    SD_MMC.end();
+    mounted = false;
+    Serial.println("[sd] card unavailable");
+}
+
+#elif BOARD_SD_USABLE
 
 #include <SD.h>
 #include <SPI.h>

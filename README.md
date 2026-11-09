@@ -98,12 +98,13 @@ The Stats screen shows solves, average and best time per difficulty, and
 your most recent games. **Delete last** removes the most recent entry (for a
 game recorded by mistake) and **Clear all** wipes the history.
 
-- **With a microSD card** (3.2", 3.5" and 4.0" boards): saved to
+- **With a microSD card** (3.2", 3.5", 4.0" and ESP32-S3 4.0" boards): saved to
   `CYD-Sudoku/stats.csv` on the card, full history, opens in Excel.
   Anything recorded before the card went in is moved onto it.
-- **Without a card**, and on the 2.8" boards for now: saved in the board's
-  memory (the most recent 250 games). The 2.8" board's SD slot shares a
-  controller with its touch screen and needs a driver change first.
+- **Without a card**, and on the 2.8" boards and the NM-CYD-C5 for now:
+  saved in the board's memory (the most recent 250 games). On those boards
+  the SD slot shares a bus with the screen or touch controller and needs a
+  driver change first.
 
 ## Install
 
@@ -115,26 +116,34 @@ flash it at address **0x0** with Espressif's Flash Download Tool.
 
 ## Supported boards
 
-Boards are named by screen size, display driver and touch type. Check the
-text printed on the back of the board.
+Boards are named by chip (when it isn't the plain ESP32), screen size,
+display driver and touch type. Check the text printed on the back of the
+board.
 
-| Firmware file | Printed on the back |
-|---|---|
-| `CYD_2.8in_ILI9341_Resistive.bin` | ESP32-2432S028 (often with R) — usually single micro-USB |
-| `CYD_2.8in_ST7789_Resistive.bin` | ESP32-2432S028 (often with R) — usually micro-USB + USB-C |
-| `CYD_3.2in_ST7789_Resistive.bin` | 3.2" LCD Display, ESP32-32E, 240x320, Resistive Touch |
-| `CYD_3.5in_ST7796_Resistive.bin` | 3.5" LCD Display, ESP32-32E, 320x480, Resistive Touch |
-| `CYD_4.0in_ST7796_Resistive.bin` | 4.0" LCD Display, ESP32-32E, 320x480, Resistive Touch |
+| Firmware file | Printed on the back | Tested |
+|---|---|---|
+| `CYD_2.8in_ILI9341_Resistive.bin` | ESP32-2432S028 (often with R) — usually single micro-USB | Yes |
+| `CYD_2.8in_ST7789_Resistive.bin` | ESP32-2432S028 (often with R) — usually micro-USB + USB-C | Yes |
+| `CYD_3.2in_ST7789_Resistive.bin` | 3.2" LCD Display, ESP32-32E, 240x320, Resistive Touch | Yes |
+| `CYD_3.5in_ST7796_Resistive.bin` | 3.5" LCD Display, ESP32-32E, 320x480, Resistive Touch | Yes |
+| `CYD_4.0in_ST7796_Resistive.bin` | 4.0" LCD Display, ESP32-32E, 320x480, Resistive Touch | Yes |
+| `CYD_ESP32-S3_4.0in_ST7796_Capacitive.bin` | Freenove ESP32-S3 Display, 4.0 inch, touch (FNK0104S) | Not yet |
+| `CYD_ESP32-C5_2.8in_ST7789_Resistive.bin` | NM-CYD-C5 (ESP32-C5, two USB-C ports) | Not yet |
 
-Confirmed working: 2.8" ST7789, 3.2" ST7789, 4.0" ST7796.
+**Not yet tested:** the ESP32-S3 and ESP32-C5 builds are made from each
+maker's published pins and settings but haven't been run on that hardware.
+They should work; please [open an issue](../../issues) either way.
 
-**Untested:** the 2.8" ILI9341 and 3.5" ST7796 builds use the same code and
-pin maps as their tested siblings but haven't been run on that hardware.
-They should work; please [open an issue](../../issues) either way. NM-CYD-C5
-(ESP32-C5) support may come after v1.0.
+- **ESP32-S3 4.0" (Freenove FNK0104S):** plugs in through the chip's own USB
+  port, so no USB driver is needed; if no port appears, hold BOOT while
+  plugging it in. Capacitive touch needs no calibration. Stats go to its
+  microSD card when one is in.
+- **NM-CYD-C5:** use either USB-C port to install. Its SD slot shares the
+  display's bus, so for now stats are kept in the board's memory, as on
+  the 2.8" CYD.
 
-Not sure which 2.8" you have? Try ILI9341 first. Wrong colors: see below.
-Garbled or blank screen: install the other 2.8" version.
+Not sure which 2.8" CYD you have? Try ILI9341 first. Wrong colors: see
+below. Garbled or blank screen: install the other 2.8" version.
 
 ## Building (Windows, VS Code + PlatformIO)
 
@@ -155,6 +164,8 @@ dark, and it's remembered.
 On first boot (or when the **BOOT** button is held while powering on), the
 screen shows corner arrows — tap each tip precisely. The calibration is saved
 to flash and reused. To redo it: **☰ → Display & touch → Recalibrate**.
+Capacitive boards (the ESP32-S3 4.0") need no calibration and have no
+Recalibrate button.
 
 ## Colors look wrong?
 

@@ -8,11 +8,13 @@
 // Every board must end up defining:
 //   class LGFX : public lgfx::LGFX_Device   display + touch + backlight
 //   BOARD_NAME                              e.g. "3.2\" ST7789 Resistive"
-//   BOARD_TOUCH_RESISTIVE                   1 = XPT2046 (calibrate, no gestures)
+//   BOARD_TOUCH_RESISTIVE                   1 = XPT2046 (calibrate, no gestures);
+//                                           0 = capacitive (no calibration, no Recalibrate)
 //   BOARD_PIN_BOOT_BTN                      held at power-up to recalibrate touch
 //   BOARD_SD_USABLE                         1 = SD slot works (needs BOARD_PIN_SD_*)
 // Optional: BOARD_PIN_LED_*, BOARD_LED_ACTIVE_LOW, BOARD_PIN_LDR,
 //           BOARD_PIN_SD_CS/SCK/MISO/MOSI, BOARD_PIN_AUDIO_EN, BOARD_PIN_BATTERY_ADC
+//           BOARD_SD_MMC + BOARD_PIN_SD_CLK/CMD/D0..D3   SD on the SDMMC bus (4-bit)
 //
 // Colors: each board's default inversion is a best guess. If a particular
 // unit shows a negative image or swapped red/blue, fix it on the device
@@ -57,8 +59,19 @@
   // Confirmed on hardware with these defaults
   class LGFX : public LGFX_Esp32_32E<lgfx::Panel_ST7796, 320, 480, false, false> {};
 
+// ---- ESP32-S3 boards -----------------------------------------------------------
+#elif defined(CYD_BOARD_S3_40_ST7796_CAP)
+  #include "freenove_s3_display.hpp"
+  #define BOARD_NAME "ESP32-S3 4.0\" ST7796 Capacitive"   // Freenove FNK0104S; not yet tested on hardware
+  // IPS panel: Freenove's setup turns inversion on, BGR order (TFT_eSPI's default)
+  class LGFX : public LGFX_Freenove_S3<lgfx::Panel_ST7796, 320, 480, true, false> {};
+
+// ---- ESP32-C5 boards -----------------------------------------------------------
 #elif defined(CYD_BOARD_NM_CYD_C5)
-  #error "NM-CYD-C5 is listed in platformio.ini but its board file is not written yet."
+  #include "nm_cyd_c5.hpp"
+  #define BOARD_NAME "ESP32-C5 2.8\" ST7789 Resistive"   // NM-CYD-C5; not yet tested on hardware
+  // RockBase's setup: inversion off, BGR order
+  class LGFX : public LGFX_NM_CYD_C5<lgfx::Panel_ST7789, false, false> {};
 
 #else
   #error "No CYD_BOARD_* flag set. Build one of the [env:...] targets in platformio.ini."

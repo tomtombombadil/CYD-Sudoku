@@ -134,29 +134,36 @@
   }
   .notice[hidden] { display: none; }
 
-  /* ---- Board list: size numeral is the anchor of each row ---- */
-  .boards { border-top: 2px solid var(--ink); }
-  .board {
-    display: grid;
-    grid-template-columns: 5.2rem 1fr auto;
-    gap: 6px 18px;
-    align-items: start;
-    padding: 18px 0;
-    border-bottom: 1px solid var(--line);
+  /* ---- Picker: one dropdown, one Install button ---- */
+  .picker {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-top: 4px solid var(--mask);
+    border-radius: 6px;
+    padding: 20px;
+    margin: 6px 0 0;
   }
-  .size {
-    font: 700 2.6rem/0.9 "Barlow Condensed", sans-serif;
-    color: var(--copper);
+  .picker label { display: block; font-weight: 600; margin-bottom: 8px; }
+  .picker select {
+    width: 100%;
+    font: 500 1.05rem "Barlow", sans-serif;
+    color: var(--ink);
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 11px 12px;
+    min-height: 48px;
   }
-  .board h3 { margin: 0; font: 600 1.15rem/1.3 "Barlow", sans-serif; }
-  .board .hint { margin: 4px 0 0; color: var(--muted); font-size: 0.97rem; }
-  .board .untested {
+  .picker select:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+  .chosen { margin-top: 16px; display: grid; grid-template-columns: 1fr auto; gap: 6px 18px; align-items: center; }
+  .chosen[hidden] { display: none; }
+  .chosen .hint { margin: 0; color: var(--muted); font-size: 0.97rem; }
+  .chosen .dl { font-size: 0.9rem; display: inline-block; margin-top: 6px; }
+  .untested {
     display: table; margin: 6px 0 0; padding: 2px 8px;
     border: 1px solid var(--copper); border-radius: 4px;
     color: var(--copper); font-size: 0.9rem;
   }
-  .board .dl { font-size: 0.9rem; margin-top: 6px; display: inline-block; }
-  .actions { align-self: center; }
 
   .install {
     appearance: none;
@@ -165,17 +172,39 @@
     background: var(--mask);
     color: #1E1B12;
     font: 600 1rem "Barlow", sans-serif;
-    padding: 12px 20px;
-    min-height: 46px;
+    padding: 12px 24px;
+    min-height: 48px;
     cursor: pointer;
     box-shadow: inset 0 -3px 0 var(--mask-d);
   }
   .install:hover { background: #EBC24E; }
-  .unsupported { color: var(--muted); font-size: 0.9rem; max-width: 14ch; display: block; }
+  .unsupported { color: var(--muted); font-size: 0.9rem; max-width: 16ch; display: block; }
+
+  /* ---- Reference list: size numeral is the anchor of each row ---- */
+  .boards { border-top: 2px solid var(--ink); }
+  .board {
+    display: grid;
+    grid-template-columns: 5.2rem 1fr;
+    gap: 6px 18px;
+    align-items: start;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .size {
+    font: 700 2.4rem/0.9 "Barlow Condensed", sans-serif;
+    color: var(--copper);
+  }
+  .board h3 { margin: 0; font: 600 1.1rem/1.3 "Barlow", sans-serif; }
+  .board .hint { margin: 4px 0 0; color: var(--muted); font-size: 0.97rem; }
+  .board .pick {
+    appearance: none; background: none; border: 0; padding: 0; margin-top: 6px;
+    color: var(--copper); font: 500 0.95rem "Barlow", sans-serif;
+    text-decoration: underline; text-underline-offset: 2px; cursor: pointer;
+  }
 
   @media (max-width: 560px) {
     .board { grid-template-columns: 4rem 1fr; }
-    .actions { grid-column: 1 / -1; }
+    .chosen { grid-template-columns: 1fr; }
     .install { width: 100%; }
   }
 
@@ -207,17 +236,26 @@
   </p>
   <ol class="steps">
     <li><strong>Plug the board into your computer</strong> with a USB cable that carries data (some charge-only cables don't).</li>
-    <li><strong>Find your board below and click Install.</strong> Pick the serial port that appears. If none appears on Windows, install the <a href="https://www.wch-ic.com/downloads/CH341SER_EXE.html" target="_blank" rel="noopener">CH340 USB driver</a> and try again.</li>
+    <li><strong>Choose your board below and click Install.</strong> Pick the serial port that appears. If none appears on Windows, install the <a href="https://www.wch-ic.com/downloads/CH341SER_EXE.html" target="_blank" rel="noopener">CH340 USB driver</a> and try again. ESP32-S3 boards need no driver; if no port appears, hold the BOOT key while plugging the board in.</li>
     <li><strong>Wait for "Installation complete",</strong> then press the board's reset button (or unplug and replug it).</li>
   </ol>
 
-  <h2>Choose your board</h2>
-  <p>Boards are identified by screen size, display driver and touch type. Check the text printed on the back of the board.</p>
+  <div class="picker">
+    <label for="board">Your board</label>
+    <select id="board" disabled><option>Loading boards…</option></select>
+    <div class="chosen" id="chosen" hidden>
+      <div id="chosen-info"></div>
+      <div id="chosen-btn"></div>
+    </div>
+  </div>
+
+  <h2>Which board do I have?</h2>
+  <p>Boards are told apart by chip (when it isn't the plain ESP32), screen size, display driver and touch type. Check the text printed on the back of the board.</p>
   <div class="boards" id="boards"><p class="loading">Loading boards…</p></div>
 
   <h2>After installing</h2>
   <ul class="after">
-    <li><strong>Touch calibration</strong> runs on first start: tap the tip of each corner arrow. To redo it later, hold the <strong>BOOT</strong> button while powering on.</li>
+    <li><strong>Touch calibration</strong> runs on first start on resistive boards: tap the tip of each corner arrow. To redo it later, hold the <strong>BOOT</strong> button while powering on. Capacitive boards need no calibration.</li>
     <li><strong>Colors look wrong?</strong> Tap <strong>Invert</strong> if the background is light or colors look like a negative, and <strong>Swap R/B</strong> if the red and blue bars are swapped. The board remembers the fix.</li>
     <li><strong>Blank or garbled screen on a 2.8" board?</strong> It probably has the other display driver. Install the other 2.8" version.</li>
   </ul>
@@ -239,41 +277,79 @@
     return e;
   }
 
-  function row(b) {
-    // "3.2\" ST7789 Resistive" -> size "3.2", rest "ST7789 Resistive"
-    const m = b.title.match(/^([\d.]+)"\s*(.*)$/);
-    const size = m ? m[1] : "";
-    const rest = m ? m[2] : b.title;
+  const ISSUES = "https://github.com/tomtombombadil/CYD-Sudoku/issues";
+  const select = document.getElementById("board");
+  let boards = [];
+
+  // "3.2\" ST7789 Resistive" -> "3.2"; "ESP32-S3 4.0\" ..." -> "4.0"
+  function size(title) {
+    const m = title.match(/([\d.]+)"/);
+    return m ? m[1] : "";
+  }
+
+  function untested() {
+    return el("p", { class: "untested" }, "Not yet tested on this board. Please ",
+      el("a", { href: ISSUES }, "tell us"), " if it works or not.");
+  }
+
+  // Show the chosen board's details and its Install button
+  function pick() {
+    const b = boards.find(x => x.name === select.value);
+    const box = document.getElementById("chosen");
+    if (!b) { box.hidden = true; return; }
+    try { localStorage.setItem("cyd-sudoku-board", b.name); } catch (e) {}
 
     const btn = el("esp-web-install-button", { manifest: `manifests/${b.name}.json` });
-    const activate = el("button", { class: "install", slot: "activate", type: "button" }, "Install");
-    const unsup = el("span", { class: "unsupported", slot: "unsupported" }, "Needs Chrome or Edge");
-    const notAllowed = el("span", { class: "unsupported", slot: "not-allowed" }, "Needs a secure (https) page");
-    btn.append(activate, unsup, notAllowed);
-
+    btn.append(
+      el("button", { class: "install", slot: "activate", type: "button" }, "Install"),
+      el("span", { class: "unsupported", slot: "unsupported" }, "Needs Chrome or Edge"),
+      el("span", { class: "unsupported", slot: "not-allowed" }, "Needs a secure (https) page"));
     const kb = Math.round(b.size / 1024);
+    document.getElementById("chosen-info").replaceChildren(
+      el("p", { class: "hint" }, b.hint),
+      ...(b.tested === false ? [untested()] : []),
+      el("a", { class: "dl", href: `firmware/${b.file}`, download: b.file },
+        `Download ${b.file} (${kb} KB, flash at 0x0)`));
+    document.getElementById("chosen-btn").replaceChildren(btn);
+    box.hidden = false;
+  }
+  select.addEventListener("change", pick);
+
+  function reference(b) {
+    const choose = el("button", { class: "pick", type: "button" }, "Choose this board");
+    choose.addEventListener("click", () => {
+      select.value = b.name;
+      pick();
+      select.scrollIntoView({ behavior: "smooth", block: "center" });
+      select.focus({ preventScroll: true });
+    });
     return el("div", { class: "board" },
-      el("div", { class: "size", "aria-hidden": "true" }, size),
+      el("div", { class: "size", "aria-hidden": "true" }, size(b.title)),
       el("div", {},
-        el("h3", {}, `${size}" ${rest}`),
+        el("h3", {}, b.title),
         el("p", { class: "hint" }, b.hint),
-        ...(b.tested === false
-          ? [el("p", { class: "untested" }, "Not yet tested on this board. Please ",
-                el("a", { href: "https://github.com/tomtombombadil/CYD-Sudoku/issues" }, "tell us"),
-                " if it works or not.")]
-          : []),
-        el("a", { class: "dl", href: `firmware/${b.file}`, download: b.file }, `Download ${b.file} (${kb} KB, flash at 0x0)`)),
-      el("div", { class: "actions" }, btn));
+        ...(b.tested === false ? [untested()] : []),
+        choose));
   }
 
   fetch("boards.json", { cache: "no-store" })
     .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
     .then(data => {
       document.getElementById("ver").textContent = `Firmware ${data.version}, built ${data.built}`;
-      const list = document.getElementById("boards");
-      list.replaceChildren(...data.boards.map(row));
+      boards = data.boards;
+      select.replaceChildren(el("option", { value: "" }, "Choose your board…"),
+        ...boards.map(b => el("option", { value: b.name },
+          `${b.title}${b.tested === false ? " (untested)" : ""}`)));
+      select.disabled = false;
+      // ?board=<firmware name> preselects (for links); else the last choice
+      let want = new URLSearchParams(location.search).get("board");
+      if (!want) { try { want = localStorage.getItem("cyd-sudoku-board"); } catch (e) {} }
+      if (want && boards.some(b => b.name === want)) select.value = want;
+      pick();
+      document.getElementById("boards").replaceChildren(...boards.map(reference));
     })
     .catch(() => {
+      select.replaceChildren(el("option", {}, "Board list didn't load"));
       document.getElementById("boards").replaceChildren(
         el("p", { class: "loading" }, "The board list didn't load. Refresh the page; if it still fails, download firmware from the releases page below."));
     });

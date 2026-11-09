@@ -31,6 +31,8 @@ LGPL for the binaries published in Releases.
 |---|---|---|
 | [witnessmenow/ESP32-Cheap-Yellow-Display](https://github.com/witnessmenow/ESP32-Cheap-Yellow-Display) | 2.8" pinouts, panel settings | MIT |
 | lcdwiki.com datasheets for the ESP32-32E display boards | 3.2"/3.5"/4.0" pinouts | Documentation |
+| [Freenove/Freenove_ESP32_S3_Display](https://github.com/Freenove/Freenove_ESP32_S3_Display) (sketches, TFT_eSPI setup, schematic) | Freenove FNK0104S pinout, panel settings | CC BY-NC-SA 3.0 (documentation; pin facts only) |
+| [NM-CYD-C5](https://github.com/Yverr0y/NM-CYD-C5) (RockBase wiki, TFT_eSPI setup, schematic) | NM-CYD-C5 pinout, panel settings | Documentation (pin facts only) |
 
 ## Sudoku code
 

@@ -18,6 +18,18 @@ import shutil
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 
+def board_chip(cfg, section):
+    """custom_chip_family of the env or the section it extends (default ESP32)."""
+    seen = set()
+    while section and section not in seen and cfg.has_section(section):
+        seen.add(section)
+        env = cfg[section]
+        if env.get("custom_chip_family"):
+            return env.get("custom_chip_family").strip()
+        section = env.get("extends", "").strip()
+    return "ESP32"
+
+
 def boards_from_ini():
     cfg = configparser.ConfigParser(interpolation=None, strict=False)
     cfg.read(ROOT / "platformio.ini", encoding="utf-8")
@@ -36,6 +48,8 @@ def boards_from_ini():
             "title": env.get("custom_board_title", name),
             "hint": env.get("custom_board_hint", ""),
             "tested": env.get("custom_board_tested", "yes").strip().lower() != "no",
+            # ESP Web Tools chipFamily; envs inherit it from their chip section
+            "chip": board_chip(cfg, section),
         })
     return boards
 
@@ -66,7 +80,7 @@ def main():
             "version": args.version,
             "new_install_prompt_erase": True,
             "builds": [{
-                "chipFamily": "ESP32",
+                "chipFamily": b["chip"],
                 # Merged factory image: bootloader + partitions + app, from 0x0
                 "parts": [{"path": f"../firmware/{b['file']}", "offset": 0}],
             }],

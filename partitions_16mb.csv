@@ -1,0 +1,9 @@
+# ESP32-S3 and ESP32-C5 boards with 16 MB flash: one 6 MB app (no OTA - the web
+# flasher is the update path) + 2 MB LittleFS ("spiffs" is the label
+# Arduino's LittleFS mounts by default). The rest of the flash is unused.
+# Name,    Type, SubType,  Offset,   Size
+nvs,       data, nvs,      0x9000,   0x5000
+otadata,   data, ota,      0xe000,   0x2000
+app0,      app,  factory,  0x10000,  0x600000
+spiffs,    data, spiffs,   0x610000, 0x200000
+coredump,  data, coredump, 0x810000, 0x10000

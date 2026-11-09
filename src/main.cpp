@@ -73,6 +73,7 @@ void toggle_swap_rb()
 
 void flash_invert(bool on) { panel_prefs_flash(lvgl_port_gfx(), on); }
 
+#if BOARD_TOUCH_RESISTIVE
 void recalibrate()
 {
     // Calibration draws with LovyanGFX directly; restarting afterwards gives
@@ -83,12 +84,22 @@ void recalibrate()
     touch_cal_run(gfx);
     ESP.restart();
 }
+#endif
 
 } // namespace
 
 void setup()
 {
+#if ARDUINO_USB_CDC_ON_BOOT && ARDUINO_USB_MODE
+    // The chip's own USB port (ESP32-S3): with a computer attached but no
+    // program reading, every full buffer would wait for it - so lines that
+    // don't fit are dropped instead
+    Serial.setTxBufferSize(2048);
     Serial.begin(115200);
+    Serial.setTxTimeoutMs(0);
+#else
+    Serial.begin(115200);
+#endif
     delay(50);
     Serial.println("\nCYD Sudoku " CYD_SUDOKU_VERSION);
     quiet_peripherals();
@@ -114,7 +125,9 @@ void setup()
     hooks.toggle_swap_rb    = toggle_swap_rb;
     hooks.flash_invert      = flash_invert;
     hooks.set_brightness    = lvgl_port_set_brightness;
-    hooks.recalibrate_touch = recalibrate;
+#if BOARD_TOUCH_RESISTIVE
+    hooks.recalibrate_touch = recalibrate;   // capacitive touch needs no calibration
+#endif
     hooks.raw_touch         = lvgl_port_raw_touch;
     hooks.record_stat       = stats_store_record;
     hooks.load_stats        = stats_store_load;
