@@ -74,6 +74,12 @@
   check it when adding screens, and keep tables as one label per column
   rather than objects per cell.
 - Game saves are format 'SUD2' (adds hints); 'SUD1' still loads.
+- Restart: an unsolved puzzle keeps its clock and hint count; a solved one
+  restarts as a replay (`Game::replay()`, spare bit 87 of the hint bits)
+  whose solve isn't recorded again. Same as CYD-Classic-Games.
+- CYD-Classic-Games (tomtombombadil/CYD-Classic-Games) carries a port of
+  this Sudoku (src/games/sudoku/). Fixes flow both ways: when one changes
+  the Sudoku core, grader, rules or stats store, check the other.
 - Game clock: counts only while the game screen is up AND there was a touch
   in the last 2 minutes (kIdlePauseMs, via lv_display_get_inactive_time).
   Times feed the stats, so don't add anything that counts unattended time.

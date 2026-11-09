@@ -107,11 +107,13 @@ void puzzle_stock_begin()
     load();
     // Core 0 (the Arduino loop and UI run on core 1); lowest priority so it
     // only uses spare time.
-    xTaskCreatePinnedToCore(worker_task, "puzzles", 12288, nullptr, tskIDLE_PRIORITY, &worker, 0);
+    if (xTaskCreatePinnedToCore(worker_task, "puzzles", 12288, nullptr, tskIDLE_PRIORITY, &worker, 0) != pdPASS)
+        worker = nullptr;   // no background stock; new games are made on the spot
 }
 
 bool puzzle_stock_take(sudoku::Difficulty d, sudoku::Grid& puzzle, sudoku::Grid& solution)
 {
+    if (!lock) return false;
     const int i = static_cast<int>(d);
     bool got = false;
     xSemaphoreTake(lock, portMAX_DELAY);

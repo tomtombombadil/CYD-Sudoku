@@ -69,6 +69,9 @@ the tool row (**Undo**, **Notes**, input mode, **Hint**); the digits 1-9.
   **Display & touch** (Light/Dark theme, brightness, panel color fixes,
   touch calibration, touch test). Buttons act on the first tap; nothing asks
   "are you sure". The game saves itself and picks up where you left off.
+- **Restart** clears your entries but keeps the clock and hint count, so
+  the time in your stats stays honest. Restarting a puzzle you've already
+  solved replays it from 0:00 and isn't recorded a second time.
 
 ## Difficulty
 

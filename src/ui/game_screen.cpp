@@ -186,7 +186,7 @@ void update()
     if (done && !solved_seen) {
         solved_seen = true;
         if (H.save) H.save(*G);
-        if (H.record_stat) {
+        if (H.record_stat && !G->replay()) {   // a solved puzzle replayed isn't a new result
             stats::Record r;
             r.difficulty = static_cast<uint8_t>(G->difficulty());
             r.result = stats::Result::Solved;
@@ -375,7 +375,7 @@ lv_obj_t* overlay_bottom_button(const char* text, lv_event_cb_t cb, intptr_t use
 // a played, unsolved game for a new one is recorded as "Gave up".
 bool game_in_progress()
 {
-    return G->active() && !G->solved() && (G->can_undo() || G->elapsed_s() >= 30);
+    return G->active() && !G->solved() && !G->replay() && (G->can_undo() || G->elapsed_s() >= 30);
 }
 
 void start_new(sudoku::Difficulty d)
